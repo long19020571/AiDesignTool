@@ -6,7 +6,188 @@
         xmlns:local="clr-namespace:AiDesignTool"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Width" Value="90"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="Label">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Width" Value="90"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Width" Value="90"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="ToggleButton">
+            <Setter Property="Width" Value="90"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <GroupBox Header="Header Title" Margin="10" Padding="10" Grid.Column="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="30"/>
+                    <RowDefinition Height="auto"/>
+                    <RowDefinition Height="auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="30"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Grid.Row="0" Grid.Column="0" Content="Profile :"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" Width="120"/>
+                    <TextBox Grid.Row="0" Grid.Column="2" Width="120"/>
+                    <Button Grid.Row="0" Grid.Column="3" Width="30" Content="📁"/>
+                </Grid>
+                <GroupBox Grid.Row="1" Header="Panel">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="0"/>
+                            <ColumnDefinition Width="45"/>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="45"/>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="45"/>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height=" 30"/>
+                            <RowDefinition Height=" 30"/>
+                            <RowDefinition Height=" 30"/>
+                            <RowDefinition Height=" 30"/>
+                            <RowDefinition Height=" 30"/>
+                            <RowDefinition Height=" 30"/>
+                        </Grid.RowDefinitions>
+                        <Label   Grid.Column="0" Grid.Row="0" Content="Property :"/>
+                        <Label   Grid.Column="2" Grid.Row="1" Content="Width"/>
+                        <TextBox Grid.Column="3" Grid.Row="1"/>
+                        <Label   Grid.Column="4" Grid.Row="1" Content="pt"/>
+                        <Label   Grid.Column="5" Grid.Row="1" Content="Height"/>
+                        <TextBox Grid.Column="6" Grid.Row="1"/>
+                        <Label   Grid.Column="7" Grid.Row="1" Content="pt"/>
 
+                        <Label   Grid.Column="0" Grid.Row="2" Content="Art Config :"/>
+                        <Label   Grid.Column="2" Grid.Row="3" Content="Width"/>
+                        <TextBox Grid.Column="3" Grid.Row="3"/>
+                        <Label   Grid.Column="4" Grid.Row="3" Content="pt"/>
+                        <Label   Grid.Column="5" Grid.Row="3" Content="Height"/>
+                        <TextBox Grid.Column="6" Grid.Row="3"/>
+                        <Label   Grid.Column="7" Grid.Row="3" Content="pt"/>
+                        <Label   Grid.Column="8" Grid.Row="3" Content="Space"/>
+                        <TextBox Grid.Column="9" Grid.Row="3"/>
+                        <Label   Grid.Column="10" Grid.Row="3" Content="pt"/>
+
+                        <Label   Grid.Column="0" Grid.Row="4" Content="Cut Color :"/>
+                        <Label   Grid.Column="2" Grid.Row="5" Content="RGB"/>
+                        <TextBox Grid.Column="3" Grid.Row="5"/>
+                        <Label   Grid.Column="4" Grid.Row="5" Content="pt"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Grid.Row="2" Header="Config :">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                        </Grid.RowDefinitions>
+                        <ComboBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"/>
+                        <Label    Grid.Row="0" Grid.Column="2" Content="Path :"/>
+                        <TextBox  Grid.Row="0" Grid.Column="3"/>
+                        <Button   Grid.Row="0" Grid.Column="4" Content="..."/>
+
+                        <Label    Grid.Row="1" Grid.Column="0" Content="Variables :"/>
+                        <ListView Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Grid.RowSpan="6"/>
+
+                        <Label    Grid.Row="1" Grid.Column="2" Content="Properties :"/>
+                        <Label    Grid.Row="2" Grid.Column="3" Content="Name"/>
+                        <TextBox  Grid.Row="2" Grid.Column="4"/>
+                        <Label    Grid.Row="3" Grid.Column="3" Content="Type"/>
+                        <ComboBox Grid.Row="3" Grid.Column="4" />
+                        <CheckBox Grid.Row="4" Grid.Column="3" Content="Fit"/>
+                        <Label    Grid.Row="4" Grid.Column="4" Content="Width"/>
+                        <TextBox  Grid.Row="4" Grid.Column="5"/>
+                        <Label    Grid.Row="5" Grid.Column="4" Content="Height"/>
+                        <TextBox  Grid.Row="5" Grid.Column="5"/>
+                        <CheckBox Grid.Row="6" Grid.Column="3" Content="One line"/>
+                        <CheckBox Grid.Row="7" Grid.Column="3" Content="Magic"/>
+                        <ComboBox Grid.Row="7" Grid.Column="4"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Grid.Row="3" Header="Control">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="30"/>
+                        </Grid.RowDefinitions>
+                        <Button Grid.Row="0" Grid.Column="0" Content="Creat"/>
+                        <ToggleButton Grid.Row="1" Grid.Column="0" Content="Edit"/>
+                        <Button Grid.Row="2" Grid.Column="0" Content="Save"/>
+                        <Button Grid.Row="3" Grid.Column="0" Content="Delete"/>
+
+                        <Button Grid.Row="0" Grid.Column="1" Content="Load Data"/>
+                        <Button Grid.Row="1" Grid.Column="1" Content="Create Art"/>
+                        <Button Grid.Row="2" Grid.Column="1" Content="Create PC"/>
+                        <Button Grid.Row="3" Grid.Column="1" Content="Verify 2"/>
+                    </Grid>
+                </GroupBox>
+            </Grid>
+        </GroupBox>
     </Grid>
 </Window>
