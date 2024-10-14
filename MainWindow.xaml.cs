@@ -19,6 +19,7 @@ namespace AiDesignTool
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = new MainViewModel();
         }
     }
 }
