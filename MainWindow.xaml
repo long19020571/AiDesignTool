@@ -4,34 +4,35 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:AiDesignTool"
+        xmlns:lcommands="clr-namespace:AiDesignTool.LCommands"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="630"/>
         </Grid.ColumnDefinitions>
-        <GroupBox Header="Header Title" Margin="10" Padding="10" Grid.Column="1">
-            <Grid>
+        <GroupBox Header="Controller" Margin="10" Padding="10" Grid.Column="1">
+            <Grid >
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="30"/>
+                    <RowDefinition Height="30"  />
                     <RowDefinition Height="auto"/>
                     <RowDefinition Height="auto"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"   />
                 </Grid.RowDefinitions>
-                <Grid Grid.Row="0">
+                <Grid Grid.Row="0" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="80"/>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="190"/>
+                        <ColumnDefinition Width="30" />
                     </Grid.ColumnDefinitions>
                     <Label    Grid.Row="0" Grid.Column="0" Content="Profile :"/>
-                    <ComboBox Grid.Row="0" Grid.Column="1" Width="120" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" DisplayMemberPath="Name"/>
+                    <ComboBox x:Name="CBProfiles" Grid.Row="0" Grid.Column="1" Width="120" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" DisplayMemberPath="Name"/>
                     <TextBox  Grid.Row="0" Grid.Column="2" Width="120" Text="{Binding SelectedProfile.Name, Mode=TwoWay}"/>
-                    <Button   Grid.Row="0" Grid.Column="3" Width="30" Content="📁"/>
+                    <Button   Grid.Row="0" Grid.Column="3" Width="30"  Content="📁"  Command="{Binding SelectProfileDirectory}"/>
                 </Grid>
-                <GroupBox Grid.Row="1" Header="Panel">
+                <GroupBox Grid.Row="1" Header="Panel" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="70"/>
@@ -56,70 +57,77 @@
                         </Grid.RowDefinitions>
                         <Label   Grid.Column="0" Grid.Row="0" Content="Property :"/>
                         <Label   Grid.Column="2" Grid.Row="1" Content="Width"/>
-                        <TextBox Grid.Column="3" Grid.Row="1" Text="{Binding SelectedProfile.Panel.CutColor, Mode=TwoWay}"/>
+                        <TextBox Grid.Column="3" Grid.Row="1" Text="{Binding SelectedProfile.Panel.Width, Mode=TwoWay, StringFormat={}{0:N4}}"/>
                         <Label   Grid.Column="4" Grid.Row="1" Content="pt"/>
                         <Label   Grid.Column="5" Grid.Row="1" Content="Height"/>
-                        <TextBox Grid.Column="6" Grid.Row="1" />
+                        <TextBox Grid.Column="6" Grid.Row="1" Text="{Binding SelectedProfile.Panel.Height, Mode=TwoWay, StringFormat={}{0:N4}}"/>
                         <Label   Grid.Column="7" Grid.Row="1" Content="pt"/>
 
                         <Label   Grid.Column="0" Grid.Row="2" Content="Art Config :"/>
                         <Label   Grid.Column="2" Grid.Row="3" Content="Width"/>
-                        <TextBox Grid.Column="3" Grid.Row="3"/>
+                        <TextBox Grid.Column="3" Grid.Row="3" Text="{Binding SelectedProfile.Panel.ArtConfig.Width, Mode=TwoWay, StringFormat={}{0:N4}}"/>
                         <Label   Grid.Column="4" Grid.Row="3" Content="pt"/>
                         <Label   Grid.Column="5" Grid.Row="3" Content="Height"/>
-                        <TextBox Grid.Column="6" Grid.Row="3"/>
+                        <TextBox Grid.Column="6" Grid.Row="3" Text="{Binding SelectedProfile.Panel.ArtConfig.Height, Mode=TwoWay, StringFormat={}{0:N4}}"/>
                         <Label   Grid.Column="7" Grid.Row="3" Content="pt"/>
                         <Label   Grid.Column="8" Grid.Row="3" Content="Space"/>
-                        <TextBox Grid.Column="9" Grid.Row="3"/>
+                        <TextBox Grid.Column="9" Grid.Row="3" Text="{Binding SelectedProfile.Panel.ArtConfig.Space, Mode=TwoWay, StringFormat={}{0:N4}}"/>
                         <Label   Grid.Column="10" Grid.Row="3" Content="pt"/>
 
                         <Label   Grid.Column="0" Grid.Row="4" Content="Cut Color :"/>
                         <Label   Grid.Column="2" Grid.Row="5" Content="RGB"/>
-                        <TextBox Grid.Column="3" Grid.Row="5"/>
+                        <TextBox Grid.Column="3" Grid.Row="5" Text="{Binding SelectedProfile.Panel.CutColor, Mode=TwoWay, Converter={StaticResource RGBToStringConverter}}"/>
                         <Label   Grid.Column="4" Grid.Row="5" Content="pt"/>
                     </Grid>
                 </GroupBox>
-                <GroupBox Grid.Row="2" Header="Config :">
+                <GroupBox Grid.Row="2" Header="Config :" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="70"/>
-                            <ColumnDefinition Width="70"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="30"/>
+                            <RowDefinition Height="100"/>
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
-                            <RowDefinition Height="30"/>
-                            <RowDefinition Height="30"/>
-                            <RowDefinition Height="30"/>
-                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="100"/>
                             <RowDefinition Height="30"/>
                         </Grid.RowDefinitions>
-                        <ComboBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"/>
-                        <Label    Grid.Row="0" Grid.Column="2" Content="Path :"/>
-                        <TextBox  Grid.Row="0" Grid.Column="3"/>
-                        <Button   Grid.Row="0" Grid.Column="4" Content="..."/>
+                        <Label Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="0" Content="DesignConfig"/>
+                        <Label Grid.Column="3" Grid.ColumnSpan="2" Grid.Row="0" Content="ItemConfig"/>
+                        <Label Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="0" Content="Magic"/>
+                        <Label Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="3" Content="Mapping"/>
 
-                        <Label    Grid.Row="1" Grid.Column="0" Content="Variables :"/>
-                        <ListView Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Grid.RowSpan="6"/>
+                        <ListView Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1" Grid.RowSpan="4" ItemsSource="{Binding DesignConfigs}" SelectedItem="{Binding SelectedDesignConfig}" DisplayMemberPath="Label"/>
+                        <DataGrid Grid.Column="3" Grid.ColumnSpan="2" Grid.Row="1" Grid.RowSpan="4" ItemsSource="{Binding ItemConfigs}"   SelectedItem="{Binding SelectedItemConfig, TargetNullValue={x:Static CollectionView.NewItemPlaceholder}}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn     Header="Name"      Width="*" Binding="{Binding Name}" />
+                                <DataGridComboBoxColumn Header="Item Type" Width="*" ItemsSource="{Binding Source={StaticResource ItemType}}" SelectedItemBinding="{Binding ItemType}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <DataGrid Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="1" CanUserSortColumns="False" ItemsSource="{Binding Magics}" SelectedItem="{Binding SelectedMagic, TargetNullValue={x:Static CollectionView.NewItemPlaceholder}}">
+                            <DataGrid.Columns>
+                                <DataGridComboBoxColumn Header="Spell"    Width="*" ItemsSource="{Binding Source={StaticResource Spell}}" SelectedItemBinding="{Binding Spell}"/>
+                                <DataGridTextColumn     Header="Elements" Width="*" Binding="{Binding Elements}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <ListView Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="4" ItemsSource="{Binding Mappings}"/>
 
-                        <Label    Grid.Row="1" Grid.Column="2" Content="Properties :"/>
-                        <Label    Grid.Row="2" Grid.Column="3" Content="Name"/>
-                        <TextBox  Grid.Row="2" Grid.Column="4"/>
-                        <Label    Grid.Row="3" Grid.Column="3" Content="Type"/>
-                        <ComboBox Grid.Row="3" Grid.Column="4" />
-                        <CheckBox Grid.Row="4" Grid.Column="3" Content="Fit"/>
-                        <Label    Grid.Row="4" Grid.Column="4" Content="Width"/>
-                        <TextBox  Grid.Row="4" Grid.Column="5"/>
-                        <Label    Grid.Row="5" Grid.Column="4" Content="Height"/>
-                        <TextBox  Grid.Row="5" Grid.Column="5"/>
-                        <CheckBox Grid.Row="6" Grid.Column="3" Content="One line"/>
-                        <CheckBox Grid.Row="7" Grid.Column="3" Content="Magic"/>
-                        <ComboBox Grid.Row="7" Grid.Column="4"/>
+                        <Button Grid.Column="0" Grid.Row="6" Width="60"  Content="📄" FontSize="15" Command="{Binding AddDesignConfig }"/>
+                        <Button Grid.Column="1" Grid.Row="6" Width="60"  Content="❌" FontSize="15" Command="{Binding DeleteDesignConfig }"/>
+                        <Button Grid.Column="3" Grid.Row="6" Width="100" Content="➕" FontSize="15" Command="{Binding AddItemConfig }"/>
+                        <Button Grid.Column="4" Grid.Row="6" Width="100" Content="➖" FontSize="15" Command="{Binding DeleteItemConfig }"/>
+                        <Button Grid.Column="6" Grid.Row="2" Width="100" Content="➕" FontSize="15" Command="{Binding AddMagic }"/>
+                        <Button Grid.Column="7" Grid.Row="2" Width="100" Content="➖" FontSize="15" Command="{Binding DeleteMagic }"/>
+                        <Button Grid.Column="6" Grid.Row="5" Width="100" Content="🛠️" FontSize="15" Command="{Binding MakeMapping }"/>
+                        <Button Grid.Column="7" Grid.Row="5" Width="100" Content="🗑️" FontSize="15" Command="{Binding DeleteMapping }"/>
                     </Grid>
                 </GroupBox>
                 <GroupBox Grid.Row="3" Header="Control">
@@ -136,18 +144,42 @@
                             <RowDefinition Height="30"/>
                             <RowDefinition Height="30"/>
                         </Grid.RowDefinitions>
-                        <Button Grid.Row="0" Grid.Column="0" Content="Creat" Command="{Binding CreateProfile}"/>
-                        <ToggleButton Grid.Row="1" Grid.Column="0" Content="Edit"/>
-                        <Button Grid.Row="2" Grid.Column="0" Content="Save" Command="{Binding SaveProfile}"/>
-                        <Button Grid.Row="3" Grid.Column="0" Content="Delete" Command="{Binding DeleteProfile}"/>
+                        <Button       Grid.Row="0" Grid.Column="0" Content="Creat" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}" Command="{Binding CreateProfile}"/>
+                        <Button       Grid.Row="1" Grid.Column="0" Content="Save" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}" Command="{Binding SaveProfile}"/>
+                        <Button       Grid.Row="2" Grid.Column="0" Content="Delete" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}" Command="{Binding DeleteProfile}"/>
+                        <ToggleButton Grid.Row="3" Grid.Column="0" Content="Working Mode" IsChecked="{Binding WorkingMode, Mode=OneWayToSource}" Command="{Binding CheckProfile}"/>
 
-                        <Button Grid.Row="0" Grid.Column="1" Content="Load Data"/>
-                        <Button Grid.Row="1" Grid.Column="1" Content="Create Art"/>
-                        <Button Grid.Row="2" Grid.Column="1" Content="Create PC"/>
-                        <Button Grid.Row="3" Grid.Column="1" Content="Verify 2"/>
+                        <Button       Grid.Row="0" Grid.Column="1" Content="Load Data" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding LoadData}"/>
+                        <Button       Grid.Row="1" Grid.Column="1" Content="Create Art" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding CreateArts}"/>
+                        <Button       Grid.Row="2" Grid.Column="1" Content="Create PC" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding CreatePrintAndCut}"/>
+                        <Button       Grid.Row="3" Grid.Column="1" Content="Verify 2" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding Verify}"/>
+
+                        <Button       Grid.Row="0" Grid.Column="2" Content="Signaling" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding Signaling}"/>
+                        <Button       Grid.Row="1" Grid.Column="2" Content="Signaling" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding ClearSession}"/>
                     </Grid>
                 </GroupBox>
             </Grid>
         </GroupBox>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="30"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <RichTextBox Grid.Row="0" Margin="10" Padding="10" x:Name="RTBPublisher">
+            </RichTextBox>
+            <ProgressBar Grid.Row="1" Margin="10 0 10 0" Value="{Binding ProgressIndex}" Minimum="0" Maximum="{Binding Total}" Foreground="Aqua"/>
+            <TextBlock  Grid.Row="1" Text="{Binding ProgressPercentage, StringFormat='Progress: {0:F1} %'}"/>
+            <DataGrid Grid.Row="2" Margin="10" ItemsSource="{Binding Orders}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Id" Width="*" Binding="{Binding Id}"/>
+                    <DataGridTextColumn Header="Count" Width="*" Binding="{Binding Count}"/>
+                    <DataGridTextColumn Header="Type" Width="*" Binding="{Binding Label}"/>
+                    <DataGridTextColumn Header="Order Number" Width="*" Binding="{Binding OrderNumber}"/>
+                    <DataGridTextColumn Header="Data" Width="*" Binding="{Binding Data}"/>
+                </DataGrid.Columns>
+                
+            </DataGrid>
+        </Grid>
     </Grid>
 </Window>
