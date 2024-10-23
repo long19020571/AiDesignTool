@@ -154,7 +154,11 @@ namespace LObjects
 		}
 		public int CountItemConfig(ItemType type)
 		{
-			return ItemConfigs.Select(o => (o.ItemType == type)).Count();
+			int c = 0;
+			for(int i = 0; i < ItemConfigs.Count; ++i)
+				if (ItemConfigs[i].ItemType == type)
+					c++;
+			return c;
 		}
     } 
     public class BaseArt
@@ -279,7 +283,7 @@ namespace LObjects
 		[BsonId]
 		public int Id { get; set; }
 		public Spell Spell { get; set; }
-		public string Elements { get; set; }
+        public string Elements { get; set; }
 		public Magic()
 		{
 		}
@@ -292,8 +296,9 @@ namespace LObjects
 		OneLineText,
 		ShowAllText,
 		StickTextTogether,
-		FitPathInside,
-		StickPathTo
+        FitPathInsize,
+		StickPathTo,
+		Rotate
 	}
 	public enum ItemType
 	{
@@ -375,6 +380,9 @@ namespace LObjects
 		public const string storageFolderName = "\\storage\\";
         public const char REGEX_DATA_FILE_COLUMN = '\t';
         public const char REGEX_DATA_FILE_DATA = ';';
+		public const string REF_LEFT = "REF_LEFT";
+        public const string REF_BOT = "REF_BOT";
+        public const string REF_RIGHT = "REF_RIGHT";
     }
 	
 }

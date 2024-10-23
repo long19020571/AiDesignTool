@@ -130,11 +130,13 @@ public class MainViewModel :  INotifyPropertyChanged
     public ICommand Verify { get; set; }
     public ICommand Signaling { get; set; }
     public ICommand ClearSession { get; set; }
-
+    public ICommand PreLoad { get; set; }
+    public ICommand DoWork { get; set; }
 
     public MainViewModel()
 	{
         ControlSignal = new ManualResetEvent(false);
+        Flag = false;
 
         Profiles = new ObservableCollection<Profile>(
             DBConnector.GetAllProfiles()
@@ -167,19 +169,46 @@ public class MainViewModel :  INotifyPropertyChanged
         Verify = new LCommand(OnVerify);
         ClearSession = new LCommand(OnClearSession);
 
+        PreLoad = new LCommand(OnPreLoad);
+        DoWork = new LCommand(OnDoWork);
 
 
         InitializeBackgroundWorker();
 
         _isBusy = false;
+        SessionUnCleared = false;
     }
     private void OnSignaling(object parameter)
     {
         ControlSignal.Set();
+        Flag = false;
     }
     private void OnClearSession(object parameter)
     {
         MainDriver.ClearSession();
+        Orders?.Clear();
+        SessionUnCleared = false;
+    }
+    private void OnPreLoad(object parameter)
+    {
+        if (WorkingMode)
+        {
+            MainDriver.SetWorkingFolder(SelectedProfile.FolderPath);
+            MainDriver.SetTemplatePanel(SelectedProfile.Panel);
+            MainDriver.SetMessegeTunel(EnqueueMessege);
+            MainDriver.SetSignaling(ControlSignal);
+            MainDriver.SetDesignConfigs(SelectedProfile.DesignConfigs);
+            MainDriver.SetProgressMessege(Progress);
+            MainDriver.SetCutColor(SelectedProfile.Panel.CutColor);
+            MainDriver.StartDriver();
+            SessionUnCleared = true;
+            EnqueueMessege(new Messege("Loaded all Config successfilly", MessegeInfo.Notification, null));
+        }
+    }
+    private void OnDoWork(object parameter)
+    {
+        MainDriver.StartDriver();
+        MainDriver.SetCutColor(SelectedProfile.Panel.CutColor);
     }
 
     private void OnSelectProfileDirectory(object parameter)
@@ -196,6 +225,7 @@ public class MainViewModel :  INotifyPropertyChanged
         if (result == true)
         {
             SelectedProfile.FolderPath = dialog.FolderName;
+            EnqueueMessege(new Messege("Selected : " + dialog.FolderName, MessegeInfo.Notification, null));
         }
     }
     private void OnAddDesignConfig(object parameter)
@@ -222,6 +252,8 @@ public class MainViewModel :  INotifyPropertyChanged
                 DBConnector.AddDesignConfig(newDesignConfirg);
             }
             DBConnector.UpdateProfile(SelectedProfile);
+
+            EnqueueMessege(new Messege("Selected : " + dialog.FileNames.Length + " file(s)", MessegeInfo.Notification, null));
         }
     }
     private void OnDeleteDesignConfig(object parameter)
@@ -232,7 +264,6 @@ public class MainViewModel :  INotifyPropertyChanged
     }
     private void OnAddItemConfig(object parameter)
     {
-
         ItemConfig newItemConfig = new ItemConfig();
         ItemConfigs.Add(newItemConfig);
         SelectedDesignConfig.ItemConfigs.Add(newItemConfig);
@@ -261,16 +292,14 @@ public class MainViewModel :  INotifyPropertyChanged
         SelectedItemConfig.Magics.Remove(SelectedMagic);
         Magics.Remove(SelectedMagic);
     }
-    private void OnMakeMapping(object parameter)
+    
+    private void OnDeleteMapping(object parameter)
     {
-        MessageBox.Show(" OnMakeMapping");
-        List<ItemMapping> mappings = MainDriver.MakeMapping();
-        DBConnector.AddItemMapping(mappings);
-        SelectedDesignConfig.ItemMappings = mappings;
-        Mappings = new ObservableCollection<ItemMapping>(mappings);
+        DBConnector.DeleteItemMapping(Mappings);
+        SelectedDesignConfig.ItemMappings.Clear();
+        Mappings.Clear();
         DBConnector.UpdateDesignConfig(SelectedDesignConfig);
     }
-    private void OnDeleteMapping(object parameter) { MessageBox.Show(" OnDeleteMapping");}
 
     private void OnCreateProfile(object parameter)
     {
@@ -319,6 +348,18 @@ public class MainViewModel :  INotifyPropertyChanged
                 EnqueueMessege(
                 new Messege("Created art folder.", MessegeInfo.Notification, null)
                 );
+            } else
+            {
+                int i = 0;
+                if(MessageBox.Show("Delete all Created Arts ?", "Warning", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)
+                    foreach (string item in Directory.GetFiles(f1))
+                    {
+                        File.Delete(item);
+                        ++i;
+                    }
+                EnqueueMessege(
+                new Messege("Deleted " + i + " File(s)", MessegeInfo.Warning, null)
+                );
             }
             if (!Directory.Exists(f2))
             {
@@ -353,17 +394,6 @@ public class MainViewModel :  INotifyPropertyChanged
             }
         }
         WorkingMode = t;
-        if(WorkingMode)
-        {
-            MainDriver.SetWorkingFolder(SelectedProfile.FolderPath);
-            MainDriver.SetTemplatePanel(SelectedProfile.Panel);
-            MainDriver.SetMessegeTunel(EnqueueMessege);
-            MainDriver.SetSignaling(ControlSignal);
-            MainDriver.SetDesignConfigs(SelectedProfile.DesignConfigs);
-            MainDriver.SetProgressMessege(Progress);
-            MainDriver.SetCutColor(SelectedProfile.Panel.CutColor);
-            MainDriver.StartDriver();
-        }
     }
     //
     private bool _WorkingMode;
@@ -375,7 +405,24 @@ public class MainViewModel :  INotifyPropertyChanged
             _WorkingMode = value;
             OnPropertyChanged(nameof(WorkingMode));
             OnPropertyChanged(nameof(NonWorkingMode));
+            OnPropertyChanged(nameof(SessionUnCleared));
+            OnPropertyChanged(nameof(PreLoaded));
         }
+    }
+    private bool _SessionUnCleared;
+    public bool SessionUnCleared
+    {
+        get => (_SessionUnCleared && _WorkingMode);
+        set
+        {
+            _SessionUnCleared = value;
+            OnPropertyChanged(nameof(SessionUnCleared));
+            OnPropertyChanged(nameof(PreLoaded));
+        }
+    }
+    public bool PreLoaded
+    {
+        get => (!_SessionUnCleared && _WorkingMode);
     }
     public bool NonWorkingMode
     {
@@ -432,16 +479,34 @@ public class MainViewModel :  INotifyPropertyChanged
             if (G)
                 ProgressIndex = v;
             else
+            {
+                ProgressIndex = 0;
                 Total = v;
+            }
         });
     }
 
-    public ManualResetEvent ControlSignal;
+    public ManualResetEvent ControlSignal { get; set; }
+    private bool _Flag;
+    public bool Flag
+    {
+        get => _Flag;
+        set
+        {
+            _Flag = value;
+            OnPropertyChanged(nameof(Flag));
+        }
+    }
+    public void WavingFlags(bool waveing)
+    {
+        Flag = waveing;
+    }
     //
     private BackgroundWorker _DoLoadData;
     private BackgroundWorker _DoCreateArts;
     private BackgroundWorker _DoCreatePrintAndCut;
     private BackgroundWorker _DoVerify;
+    private BackgroundWorker _MakeMapping;
     private void InitializeBackgroundWorker()
     {
 
@@ -465,7 +530,31 @@ public class MainViewModel :  INotifyPropertyChanged
         _DoVerify.RunWorkerCompleted += RunWorkerCompletedHandler;
         _DoVerify.DoWork += StartVerify;
 
+        _MakeMapping= new BackgroundWorker();
+        _MakeMapping.WorkerReportsProgress = true;
+        _MakeMapping.RunWorkerCompleted += RunWorkerCompletedHandler;
+        _MakeMapping.DoWork += StartMakeMapping;
+
     }
+    private void OnMakeMapping(object parameter)
+    {
+        if (IsBusy)
+            return;
+        IsBusy = true;
+        ProgressIndex = 0;
+        _MakeMapping.RunWorkerAsync();
+    }
+    private void StartMakeMapping(object sender, DoWorkEventArgs e)
+    {
+        EnqueueMessege(new Messege("Start Make Mappings", MessegeInfo.Notification, null));
+        List<ItemMapping> mappings = MainDriver.MakeMapping();
+        DBConnector.AddItemMapping(mappings);
+        SelectedDesignConfig.ItemMappings = mappings;
+        Mappings = new ObservableCollection<ItemMapping>(mappings);
+        DBConnector.UpdateDesignConfig(SelectedDesignConfig);
+        EnqueueMessege(new Messege("Finish Make Mappings", MessegeInfo.Notification, null));
+    }
+
     private void OnLoadData(object parameter)
     {
         if (IsBusy)
@@ -505,7 +594,6 @@ public class MainViewModel :  INotifyPropertyChanged
     }
     private void OnVerify(object parameter) { }
     private void StartVerify(object sender, DoWorkEventArgs e) { }
-
     private void RunWorkerCompletedHandler(object sender, RunWorkerCompletedEventArgs e)
     {
         IsBusy = false;

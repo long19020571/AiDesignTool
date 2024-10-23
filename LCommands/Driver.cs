@@ -13,117 +13,13 @@ using NetTopologySuite.Operation.Union;
 using NetTopologySuite.IO;
 using NetTopologySuite.Geometries;
 using System.IO.MemoryMappedFiles;
+using NetTopologySuite.Index.HPRtree;
 //using System.Windows.Controls;
 
 namespace AiDesignTool.LCommands
 {
     public static class MainDriver
     {
-        //#region DataBase Action
-        //static DBConnector dBConnector;
-        //public static int AddProfile(Profile profile)
-        //{
-        //    return dBConnector.AddProfile(profile);
-        //}
-        //public static bool DeleteProfile(Profile profile)
-        //{
-        //    return dBConnector.DeleteProfile(profile);
-        //}
-        //public static Profile GetProfile(int id)
-        //{
-        //    return dBConnector.GetProfile(id);
-        //}
-        //public static IEnumerable<Profile> GetAllProfiles()
-        //{
-        //    return dBConnector.GetAllProfiles();
-        //}
-        //public static bool UpdateProfile(Profile profile)
-        //{
-        //    return dBConnector.UpdateProfile(profile);
-        //}
-        //public static int AddDesignConfig(DesignConfig designconfig)
-        //{
-        //    return dBConnector.AddDesignConfig(designconfig);
-        //}
-        //public static bool DeleteDesignConfig(DesignConfig designconfig)
-        //{
-        //    return dBConnector.DeleteDesignConfig(designconfig);
-        //}
-        //public static DesignConfig GetDesignConfig(int id)
-        //{
-        //    return dBConnector.GetDesignConfig(id);
-        //}
-        //public static IEnumerable<DesignConfig> GetAllDesignConfigs()
-        //{
-        //    return dBConnector.GetAllDesignConfigs();
-        //}
-        //public static bool UpdateDesignConfig(DesignConfig designconfig)
-        //{
-        //    return dBConnector.UpdateDesignConfig(designconfig);
-        //}
-        //public static int AddItemConfig(ItemConfig itemconfig)
-        //{
-        //    return dBConnector.AddItemConfig(itemconfig);
-        //}
-        //public static bool DeleteItemConfig(ItemConfig itemconfig)
-        //{
-        //    return dBConnector.DeleteItemConfig(itemconfig);
-        //}
-        //public static ItemConfig GetItemConfig(int id)
-        //{
-        //    return dBConnector.GetItemConfig(id);
-        //}
-        //public static IEnumerable<ItemConfig> GetAllItemConfigs()
-        //{
-        //    return dBConnector.GetAllItemConfigs();
-        //}
-        //public static bool UpdateItemConfig(ItemConfig itemconfig)
-        //{
-        //    return dBConnector.UpdateItemConfig(itemconfig);
-        //}
-        //public static int AddMagic(Magic magic)
-        //{
-        //    return dBConnector.AddMagic(magic);
-        //}
-        //public static bool DeleteMagic(Magic magic)
-        //{
-        //    return dBConnector.DeleteMagic(magic);
-        //}
-        //public static Magic GetMagic(int id)
-        //{
-        //    return dBConnector.GetMagic(id);
-        //}
-        //public static IEnumerable<Magic> GetAllMagics()
-        //{
-        //    return dBConnector.GetAllMagics();
-        //}
-        //public static bool UpdateMagic(Magic magic)
-        //{
-        //    return dBConnector.UpdateMagic(magic);
-        //}
-        //#endregion
-        //static Profile workingProfile;
-        //static MainDriver()
-        //{
-        //    dBConnector = DBConnector.GetInstance();
-        //    //appRef = new Application();
-        //    //saveOption = new IllustratorSaveOptions();
-        //    //cutSaveOption = new IllustratorSaveOptions()
-        //    //{
-        //    //    Compatibility = AiCompatibility.aiIllustrator8
-        //    //};
-        //    //noColor = new NoColor();
-        //    //captureOptions = new ImageCaptureOptions()
-        //    //{
-        //    //    AntiAliasing = true,
-        //    //    Resolution = 300,
-        //    //    Transparency = true
-        //    //};
-        //}
-        //static void SetProfile(Profile profile)
-        //{
-        //    workingProfile = profile;
-        //}
         #region Ai Action
         static Wizard wizard;
         static Application appRef;
@@ -132,6 +28,7 @@ namespace AiDesignTool.LCommands
         static NoColor noColor;
         static RGBColor cutColor;
         static ImageCaptureOptions captureOptions;
+        static DocumentPreset preset;
 
         //static List<Arts> sArts;
         static List<BaseArt> allArts;
@@ -146,6 +43,7 @@ namespace AiDesignTool.LCommands
 
         static Action<Messege> AddMessege;
         static Action<bool, int> ProgressMessege;
+        static Action<bool> WavingFlags;
 
         public static ManualResetEvent ControlSignal;
 
@@ -161,6 +59,17 @@ namespace AiDesignTool.LCommands
         }
         public static void ClearSession()
         {
+            allArts.Clear();
+            allOrders.Clear();
+            siArts.ForEach(o => o.ArtQueue.Clear());
+            artConfig = null;
+            allPanels.Clear();
+            allMappedPolygons.Clear();
+            AddMessege = null;
+            ProgressMessege = null;
+            ControlSignal = null;
+            WorkingFolder = null;
+            WavingFlags = null;
         }
         public static void SetDesignConfigs(List<DesignConfig> dcfs)
         {
@@ -192,6 +101,10 @@ namespace AiDesignTool.LCommands
         public static void SetProgressMessege(Action<bool, int> action)
         {
             ProgressMessege = action;
+        }
+        public static void SetWavingFlags(Action<bool> action)
+        {
+            WavingFlags = action;
         }
         public static void SetWorkingFolder(string workingFolder)
         {
@@ -235,6 +148,9 @@ namespace AiDesignTool.LCommands
                 Resolution = 300,
                 Transparency = true
             };
+            preset = new DocumentPreset();
+            preset.DocumentColorSpace = AiDocumentColorSpace.aiDocumentRGBColor;
+            preset.DocumentUnits = AiRulerUnits.aiUnitsPoints;
             return true;
         }
         #endregion
@@ -255,15 +171,14 @@ namespace AiDesignTool.LCommands
                 } else
                 {
                     ordes.Add(new Order(paras));
-                    ProgressMessege(true, i +1);
                 }
+                ProgressMessege(true, i + 1);
             }
             allOrders = ordes;
             return ordes; 
         }
         private static bool LoadArt(Order order)
         {
-            int key;
             Arts arts = siArts.FirstOrDefault(c => c.DesignConfig.Label == order.Label);
             DesignConfig dc = arts.DesignConfig;
             if (dc.Label != order.Label)
@@ -282,7 +197,7 @@ namespace AiDesignTool.LCommands
         }
         public static bool LoadArts()
         {
-            ProgressMessege(false, allOrders.Count -1);
+            ProgressMessege(false, allOrders.Count);
             for(int i = 0; i < allOrders.Count; ++i)
             {
                 if(!LoadArt(allOrders[i]))
@@ -290,7 +205,7 @@ namespace AiDesignTool.LCommands
                     AddMessege(new Messege("Data and Config are mismatch :" + allOrders[i].AsString(), MessegeInfo.Error, null));
                     return false;
                 }
-                ProgressMessege(true, i);
+                ProgressMessege(true, i + 1);
             }
             return true;
         }
@@ -322,7 +237,7 @@ namespace AiDesignTool.LCommands
         {
             AddMessege(new Messege("Start creating all arts.", MessegeInfo.Notification, null));
 
-            ProgressMessege(false, siArts.Select(o => o.ArtQueue.Count).Sum() -1);
+            ProgressMessege(false, siArts.Select(o => o.ArtQueue.Count).Sum());
             int p = 0;
             for (int iii = 0; iii < siArts.Count; ++iii)
             {
@@ -344,10 +259,19 @@ namespace AiDesignTool.LCommands
                 {
                     BaseArt art = ats.ArtQueue.Dequeue();
                     dynamic[] copyI = new dynamic[mergeObjs.Count];
+                    dynamic[] refI = new dynamic[3];
                     for (int i = 0; i < mergeObjs.Count; ++i)
                     {
-                        copyI[i] = mergeObjs[i].Duplicate();
-                        mergeObjs[i].Hidden = true;
+                        dynamic tmp = mergeObjs[i];
+                        string tmpName = tmp.Name;
+                        copyI[i] = tmp.Duplicate();
+                        tmp.Hidden = true;
+                        if (tmpName.Equals(Constants.REF_LEFT))
+                            refI[0] = tmp;
+                        else if (tmpName.Equals(Constants.REF_BOT))
+                            refI[1] = tmp;
+                        else if (tmpName.Equals(Constants.REF_RIGHT))
+                            refI[2] = tmp;
                     }
                     for (int i = 0; i < copyI.Length; ++i)
                     {
@@ -356,8 +280,9 @@ namespace AiDesignTool.LCommands
                         ItemConfig ic = dc.ItemConfigs[i];
                         for (int j = 0; j < ic.Magics.Count; ++j)
                         {
-                            item = DoMagic(item, art.Values[i], plgMaps, ic.Magics[j]);
+                            item = DoMagic(item, art.Values[i], plgMaps, ic.Magics[j], refI);
                         }
+                        copyI[i] = item;
                     }
                     string savePath = WorkingFolder + Constants.artFolderName + "\\" + art.Id.ToString("D8") + "_" + dc.Label + ".ai";
                     art.FilePath = savePath;
@@ -365,6 +290,7 @@ namespace AiDesignTool.LCommands
 
                     for (int i = 0; i < copyI.Length; ++i)
                     {
+                        copyI[i].Selected = true;
                         copyI[i].Delete();
                     }
 
@@ -374,13 +300,15 @@ namespace AiDesignTool.LCommands
 
                 }
                 docRef.Close(AiSaveOptions.aiDoNotSaveChanges);
+
+                AddMessege(new Messege("Finish Create Art : " + dc.Label, MessegeInfo.Notification, null));
             }
             return true;
         }
         public static bool CreatePrintAndCut()
         {
             AddMessege(new Messege("Start Create print and cut files.", MessegeInfo.Notification, null));
-            ProgressMessege(false, allArts.Count -1);
+            ProgressMessege(false, allArts.Count);
             allArts.Sort(delegate (BaseArt f1, BaseArt f2)
             {
                 return f1.Id.CompareTo(f2.Id);
@@ -393,9 +321,6 @@ namespace AiDesignTool.LCommands
 
             while (i < artCount)
             {
-                DocumentPreset preset = new DocumentPreset();
-                preset.DocumentColorSpace = AiDocumentColorSpace.aiDocumentRGBColor;
-                preset.DocumentUnits = AiRulerUnits.aiUnitsPoints;
                 Document docRef = appRef.Documents.AddDocument("preset", preset);
 
                 LPanel panel = TemplatePanel.CopyConfig();
@@ -407,16 +332,18 @@ namespace AiDesignTool.LCommands
                     GroupItem pItem = docRef.GroupItems.CreateFromFile(allArts[i].FilePath);
                     groups.Add(pItem);
                     double[] pos = panel.GetPosition(j);
-                    pItem.Position = new object[] { pos[0], pos[1] };
+                    pItem.Position = new object[] { pos[0], - pos[1] };
                     ++j; ++i;
-                    ProgressMessege(true, j);
+                    ProgressMessege(true, i);
                 }
                 List<BaseArt> errors = CheckPlacedItem(groups, panel.ContainArts);
                 if(errors.Count > 0)
                 {
                     string[] errorss = errors.Select(e => string.Join(",", e.Values)).ToArray();
                     AddMessege(new Messege("Try to fix Errors Art: ", MessegeInfo.Unhandled, errors));
+                    WavingFlags(true);
                     ControlSignal.WaitOne();
+
                 }
 
                 double[] ll = panel.GetRectId(), bb = panel.GetRectBoundary();
@@ -478,6 +405,7 @@ namespace AiDesignTool.LCommands
 
                 allArts.RemoveRange(0, i);
 
+                AddMessege(new Messege("Created panel :" + label, MessegeInfo.Notification, null));
             }
             return true;
         }
@@ -518,7 +446,7 @@ namespace AiDesignTool.LCommands
             }
             return errors;
         }
-        public static dynamic DoMagic(dynamic input, string values , PolygonMaps maps, Magic magic)
+        public static dynamic DoMagic(dynamic input, string values , PolygonMaps maps, Magic magic, dynamic[] refItem)
         {
             string elements = magic.Elements;
             switch(magic.Spell)
@@ -637,15 +565,87 @@ namespace AiDesignTool.LCommands
                                     return groupItem;
                                 }
                             }
-                            return null;
                         }
                         break;
                     }
-                case Spell.FitPathInside:
+                case Spell.FitPathInsize:
                     {
+                        
                         break;
                     }
                 case Spell.StickPathTo:
+                    {
+                        string[] es = elements.Split(Constants.REGEX_DATA_FILE_DATA);
+                        double _move = double.Parse(es[0]), minWidth = double.Parse(es[1]);
+                        Polygon lRef, bRef, rRef, plgItem;
+                        string itemName = input.Name;
+                        lRef = maps.Find(Constants.REF_LEFT);
+                        bRef = maps.Find(Constants.REF_BOT);
+                        rRef = maps.Find(Constants.REF_RIGHT);
+                        plgItem = maps.Find(itemName);
+
+                        dynamic ilRef = refItem[0], ibRel = refItem[1], irRef = refItem[2];
+
+
+                        lRef = wizard.moveTo(lRef, ilRef.Position[0], ilRef.Position[1], PositionReference.TopLeft);
+                        bRef = wizard.moveTo(bRef, ibRel.Position[0], ibRel.Position[1], PositionReference.TopLeft);
+                        rRef = wizard.moveTo(rRef, irRef.Position[0], irRef.Position[1], PositionReference.TopLeft);
+                        plgItem = wizard.moveTo(plgItem, input.Position[0], input.Position[1], PositionReference.TopLeft);
+
+                        //double[] pos = getPosition(plgItem, PositionReference.MiddleCenter);
+
+
+
+                        //Geometry dLeft, dRight;
+                        double dLeft, dRight, dBottom, itemWidth = input.Width;
+                        double scl = 1;
+                        if (itemWidth > minWidth)
+                        {
+                            AffineTransformation scaler1 = AffineTransformation.ScaleInstance(0.25, 1);
+                            double[] oldP1 = wizard.getPosition(plgItem, PositionReference.MiddleCenter);
+                            plgItem = (Polygon)scaler1.Transform(plgItem);
+                            plgItem = wizard.moveTo(plgItem, oldP1[0], oldP1[1], PositionReference.MiddleCenter);
+
+                            AffineTransformation scaler = AffineTransformation.ScaleInstance(1.05, 1);
+                            while (true)
+                            {
+                                dLeft = plgItem.Distance(lRef);
+                                dRight = plgItem.Distance(rRef);
+
+                                if (dLeft == double.NegativeZero && dRight == double.NegativeZero)
+                                {
+                                    break;
+                                }
+                                double[] oldP = wizard.getPosition(plgItem, PositionReference.MiddleCenter);
+                                plgItem = (Polygon)scaler.Transform(plgItem);
+                                plgItem = wizard.moveTo(plgItem, oldP[0], oldP[1], PositionReference.MiddleCenter);
+                                plgItem = wizard.move(plgItem, (dRight - dLeft) / 2, 0);
+                            }
+                        }
+                        else if (itemWidth <= minWidth)
+                        {
+                            while (true)
+                            {
+                                dBottom = plgItem.Distance(bRef);
+
+                                if (dBottom == double.NegativeZero)
+                                {
+                                    break;
+                                }
+                                plgItem = wizard.move(plgItem, 0, -_move);
+                            }
+                        }
+                        input.Width = plgItem.EnvelopeInternal.Width;
+                        input.Height = plgItem.EnvelopeInternal.Height;
+                        double[] pos = wizard.getPosition(plgItem, PositionReference.TopLeft);
+                        object[] poso =
+                        {
+                            pos[0],pos[1]
+                        };
+                        input.Position = poso;
+                        break;
+                    }
+                case Spell.Rotate:
                     {
                         break;
                     }
@@ -656,39 +656,49 @@ namespace AiDesignTool.LCommands
         {
             Document docRef = appRef.ActiveDocument;
             List<ItemMapping> items = new List<ItemMapping>();
-
-            for (int i = 1; i <= docRef.PathItems.Count; ++i)
+            AddMessege(new Messege("Start Make Mapping\nMaking PathItem ...", MessegeInfo.Notification, null));
+            int c = docRef.PathItems.Count;
+            ProgressMessege(false, c);
+            for (int i = 1; i <= c; ++i)
             {
                 PathItem pathItem = docRef.PathItems[i];
                 ItemMapping im = new ItemMapping();
                 im.Values = pathItem.Name;
                 im.Polygons = wizard.Localize(pathItem);
                 items.Add(im);
+                ProgressMessege(true, i);
             }
-            for (int i = 1; i <= docRef.CompoundPathItems.Count; ++i)
+            c = docRef.CompoundPathItems.Count;
+            AddMessege(new Messege("Making CompoundPathItem ...", MessegeInfo.Notification, null));
+            ProgressMessege(false, c);
+            for (int i = 1; i <= c; ++i)
             {
                 CompoundPathItem pathItem = docRef.CompoundPathItems[i];
                 ItemMapping im = new ItemMapping();
                 im.Values = pathItem.Name;
                 im.Polygons = wizard.Localize(pathItem);
                 items.Add(im);
+                ProgressMessege(true, i);
             }
-            for (int i = 1; i <= docRef.TextFrames.Count; ++i)
-            {
-                TextFrame tf = docRef.TextFrames[i];
-                string s = tf.Contents;
-                GroupItem gi = tf.CreateOutline();
+            AddMessege(new Messege("Making TextFrame ...", MessegeInfo.Notification, null));
+            //for (int i = 1; i <= docRef.TextFrames.Count; ++i)
+            //{
+            TextFrame tf = docRef.TextFrames[1];
+            string s = tf.Contents;
+            GroupItem gi = tf.CreateOutline();
 
-                int c = s.Length;
-                for (int j = c; j > 0; --j)
-                {
-                    CompoundPathItem pathItem = gi.CompoundPathItems[j];
-                    ItemMapping im = new ItemMapping();
-                    im.Values = s[c - j].ToString();
-                    im.Polygons = wizard.Localize(pathItem);
-                    items.Add(im);
-                }
+            c = s.Length;
+            ProgressMessege(false, c -1);
+            for (int j = c; j > 0; --j)
+            {
+                CompoundPathItem pathItem = gi.CompoundPathItems[j];
+                ItemMapping im = new ItemMapping();
+                im.Values = s[c - j].ToString();
+                im.Polygons = wizard.Localize(pathItem);
+                items.Add(im);
+                ProgressMessege(true, c - j);
             }
+            //}
             return items;
         }
         public static PolygonMaps LoadMapping(List<ItemMapping> mappings)

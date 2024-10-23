@@ -118,7 +118,7 @@
                                 <DataGridTextColumn     Header="Elements" Width="*" Binding="{Binding Elements}" />
                             </DataGrid.Columns>
                         </DataGrid>
-                        <ListView Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="4" ItemsSource="{Binding Mappings}"/>
+                        <ListView Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="4" ItemsSource="{Binding Mappings}" DisplayMemberPath="Values"/>
 
                         <Button Grid.Column="0" Grid.Row="6" Width="60"  Content="📄" FontSize="15" Command="{Binding AddDesignConfig }"/>
                         <Button Grid.Column="1" Grid.Row="6" Width="60"  Content="❌" FontSize="15" Command="{Binding DeleteDesignConfig }"/>
@@ -154,8 +154,10 @@
                         <Button       Grid.Row="2" Grid.Column="1" Content="Create PC" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding CreatePrintAndCut}"/>
                         <Button       Grid.Row="3" Grid.Column="1" Content="Verify 2" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding Verify}"/>
 
-                        <Button       Grid.Row="0" Grid.Column="2" Content="Signaling" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding Signaling}"/>
-                        <Button       Grid.Row="1" Grid.Column="2" Content="Signaling" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding ClearSession}"/>
+                        <Button       Grid.Row="0" Grid.Column="2" Content="Signaling" IsEnabled="{Binding Flag, Mode=OneWay}" Command="{Binding Signaling}"/>
+                        <Button       Grid.Row="1" Grid.Column="2" Content="Clear Session" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding ClearSession}"/>
+                        <Button       Grid.Row="2" Grid.Column="2" Content="Pre-Load" IsEnabled="{Binding PreLoaded, Mode=OneWay}" Command="{Binding PreLoad}"/>
+                        <Button       Grid.Row="3" Grid.Column="2" Content="Re-start Driver" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding DoWork}"/>
                     </Grid>
                 </GroupBox>
             </Grid>
