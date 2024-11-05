@@ -1,10 +1,4 @@
-﻿using LObjects;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Input;
 
@@ -91,9 +85,9 @@ namespace AiDesignTool.LCommands
         {
             string hex = value?.ToString();
             if (string.IsNullOrWhiteSpace(hex) || !hex.StartsWith("#") || (hex.Length != 7 && hex.Length != 4))
-                {
-                    return string.Empty;
-                }
+            {
+                return string.Empty;
+            }
             return hex;
         }
     }

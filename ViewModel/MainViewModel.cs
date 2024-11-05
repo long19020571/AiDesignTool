@@ -1,18 +1,15 @@
 ﻿using AiDesignTool.LCommands;
 using LObjects;
-using System;
+using Microsoft.VisualBasic;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
-using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 
-public class MainViewModel :  INotifyPropertyChanged
+public class MainViewModel : INotifyPropertyChanged
 {
     #region No1
     public event PropertyChangedEventHandler PropertyChanged;
@@ -90,6 +87,19 @@ public class MainViewModel :  INotifyPropertyChanged
     }
     //
     public ObservableCollection<ItemMapping> Mappings { get; set; }
+    private ItemMapping _SelectedItemMapping;
+    public ItemMapping SelectedItemMapping
+    {
+        get { return _SelectedItemMapping; }
+        set
+        {
+            if (_SelectedItemMapping != value)
+            {
+                _SelectedItemMapping = value;
+                OnPropertyChanged(nameof(SelectedItemMapping));
+            }
+        }
+    }
     //
     public ObservableCollection<Spell> Spells { get; set; }
     public ObservableCollection<ItemType> ItemTypes { get; set; }
@@ -108,33 +118,36 @@ public class MainViewModel :  INotifyPropertyChanged
         }
     }
 
-    public ICommand SelectProfileDirectory {  get; set; }
+    public ICommand SelectProfileDirectory { get; set; }
 
     public ICommand AddDesignConfig { get; set; }
-    public ICommand DeleteDesignConfig { get; set;}
-    public ICommand AddItemConfig { get; set;}
-    public ICommand DeleteItemConfig { get; set;}
-    public ICommand AddMagic { get; set;}
-    public ICommand DeleteMagic { get; set;}
-    public ICommand MakeMapping { get; set;}
-    public ICommand DeleteMapping { get; set;}
+    public ICommand DeleteDesignConfig { get; set; }
+    public ICommand AddItemConfig { get; set; }
+    public ICommand DeleteItemConfig { get; set; }
+    public ICommand AddMagic { get; set; }
+    public ICommand DeleteMagic { get; set; }
+    public ICommand MakeMapping { get; set; }
+    public ICommand DeleteMapping { get; set; }
 
-    public ICommand CreateProfile { get; set;}
-    public ICommand SaveProfile { get; set;}
+    public ICommand CreateProfile { get; set; }
+    public ICommand SaveProfile { get; set; }
     public ICommand DeleteProfile { get; set; }
     public ICommand CheckProfile { get; set; }
 
-    public ICommand LoadData { get; set;}
-    public ICommand CreateArts { get; set;}
-    public ICommand CreatePrintAndCut { get; set;}
+    public ICommand LoadData { get; set; }
+    public ICommand CreateArts { get; set; }
+    public ICommand CreatePrintAndCut { get; set; }
     public ICommand Verify { get; set; }
     public ICommand Signaling { get; set; }
     public ICommand ClearSession { get; set; }
     public ICommand PreLoad { get; set; }
     public ICommand DoWork { get; set; }
 
+    public ICommand Copy { get; set; }
+    public ICommand Paste { get; set; }
+
     public MainViewModel()
-	{
+    {
         ControlSignal = new ManualResetEvent(false);
         Flag = false;
 
@@ -142,7 +155,6 @@ public class MainViewModel :  INotifyPropertyChanged
             DBConnector.GetAllProfiles()
             );
         UniversalMesseges = new ConcurrentQueue<Messege>();
-        MessegeIndex = 0; ;
 
         Spells = new ObservableCollection<Spell>(Enum.GetValues(typeof(Spell)).Cast<Spell>());
         ItemTypes = new ObservableCollection<ItemType>(Enum.GetValues(typeof(ItemType)).Cast<ItemType>());
@@ -158,26 +170,47 @@ public class MainViewModel :  INotifyPropertyChanged
         DeleteMapping = new LCommand(OnDeleteMapping);
 
         CreateProfile = new LCommand(OnCreateProfile);
-        CreateProfile = new LCommand(OnCreateProfile );
-        SaveProfile = new LCommand(OnSaveProfile );
-        DeleteProfile = new LCommand(OnDeleteProfile );
+        CreateProfile = new LCommand(OnCreateProfile);
+        SaveProfile = new LCommand(OnSaveProfile);
+        DeleteProfile = new LCommand(OnDeleteProfile);
         CheckProfile = new LCommand(OnCheckProfile);
 
-        LoadData = new LCommand(OnLoadData );
-        CreateArts = new LCommand(OnCreateArts );
-        CreatePrintAndCut = new LCommand(OnCreatePrintAndCut );
+        LoadData = new LCommand(OnLoadData);
+        CreateArts = new LCommand(OnCreateArts);
+        CreatePrintAndCut = new LCommand(OnCreatePrintAndCut);
         Verify = new LCommand(OnVerify);
         ClearSession = new LCommand(OnClearSession);
+        Signaling = new LCommand(OnSignaling);
 
         PreLoad = new LCommand(OnPreLoad);
         DoWork = new LCommand(OnDoWork);
 
+        Copy = new LCommand(OnCopy);
+        Paste = new LCommand(OnPaste);
 
         InitializeBackgroundWorker();
 
         _isBusy = false;
         SessionUnCleared = false;
+
+        IsCtrlPressed = false;
     }
+
+    public List<ItemConfig> SelectedItemConfigs;
+    public List<dynamic> Clipboards;
+    public bool IsCtrlPressed;
+    private void OnCopy(object parameter)
+    {
+        Clipboards = new List<dynamic>(SelectedItemConfigs);
+    }
+    private void OnPaste(object parameter)
+    {
+        if (Clipboards != null)
+        {
+
+        }
+    }
+
     private void OnSignaling(object parameter)
     {
         ControlSignal.Set();
@@ -188,6 +221,7 @@ public class MainViewModel :  INotifyPropertyChanged
         MainDriver.ClearSession();
         Orders?.Clear();
         SessionUnCleared = false;
+        EnqueueMessege(new Messege("Session is cleared successfilly", MessegeInfo.Notification, null));
     }
     private void OnPreLoad(object parameter)
     {
@@ -199,6 +233,7 @@ public class MainViewModel :  INotifyPropertyChanged
             MainDriver.SetSignaling(ControlSignal);
             MainDriver.SetDesignConfigs(SelectedProfile.DesignConfigs);
             MainDriver.SetProgressMessege(Progress);
+            MainDriver.SetWavingFlags(WavingFlags);
             MainDriver.SetCutColor(SelectedProfile.Panel.CutColor);
             MainDriver.StartDriver();
             SessionUnCleared = true;
@@ -209,6 +244,7 @@ public class MainViewModel :  INotifyPropertyChanged
     {
         MainDriver.StartDriver();
         MainDriver.SetCutColor(SelectedProfile.Panel.CutColor);
+        EnqueueMessege(new Messege("Re-start Driver successfully", MessegeInfo.Notification, null));
     }
 
     private void OnSelectProfileDirectory(object parameter)
@@ -218,10 +254,8 @@ public class MainViewModel :  INotifyPropertyChanged
         dialog.Multiselect = false;
         dialog.Title = "Select a folder";
 
-        // Show open folder dialog box
         bool? result = dialog.ShowDialog();
 
-        // Process open folder dialog box results
         if (result == true)
         {
             SelectedProfile.FolderPath = dialog.FolderName;
@@ -230,7 +264,8 @@ public class MainViewModel :  INotifyPropertyChanged
     }
     private void OnAddDesignConfig(object parameter)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog();
+        bool CtrlPressed = IsCtrlPressed, IsDesignSelected = SelectedDesignConfig != null;
+        Microsoft.Win32.OpenFileDialog dialog = new();
         dialog.FileName = "Document";
         dialog.DefaultExt = ".ai";
         dialog.Filter = "illustrator documents (.ai)|*.ai";
@@ -238,7 +273,13 @@ public class MainViewModel :  INotifyPropertyChanged
 
         bool? result = dialog.ShowDialog();
 
-        // Process open file dialog box results
+        List<ItemConfig> configs = null;
+        List<ItemMapping> mappings = null;
+        if(CtrlPressed && IsDesignSelected)
+        {
+            configs = SelectedDesignConfig.ItemConfigs;
+            mappings = SelectedDesignConfig.ItemMappings;
+        }
         if (result == true)
         {
             for (int i = 0; i < dialog.FileNames.Length; ++i)
@@ -246,6 +287,11 @@ public class MainViewModel :  INotifyPropertyChanged
                 DesignConfig newDesignConfirg = new DesignConfig();
                 newDesignConfirg.FilePath = dialog.FileNames[i];
                 newDesignConfirg.Label = dialog.SafeFileNames[i].Replace(".ai", "");
+                if (CtrlPressed && IsDesignSelected)
+                {
+                    newDesignConfirg.ItemConfigs = configs;
+                    newDesignConfirg.ItemMappings = mappings;
+                }
                 SelectedDesignConfig = newDesignConfirg;
                 DesignConfigs.Add(newDesignConfirg);
                 SelectedProfile.DesignConfigs.Add(newDesignConfirg);
@@ -258,47 +304,67 @@ public class MainViewModel :  INotifyPropertyChanged
     }
     private void OnDeleteDesignConfig(object parameter)
     {
-        DBConnector.DeleteDesignConfig(SelectedDesignConfig);
-        SelectedProfile.DesignConfigs.Remove(SelectedDesignConfig);
-        DesignConfigs.Remove(SelectedDesignConfig);
+        if (SelectedDesignConfig is object)
+        {
+            DBConnector.DeleteDesignConfig(SelectedDesignConfig);
+            SelectedProfile.DesignConfigs.Remove(SelectedDesignConfig);
+            DesignConfigs.Remove(SelectedDesignConfig);
+            EnqueueMessege(new Messege("Design Config deleted successfilly", MessegeInfo.Notification, null));
+        }
     }
     private void OnAddItemConfig(object parameter)
     {
-        ItemConfig newItemConfig = new ItemConfig();
-        ItemConfigs.Add(newItemConfig);
-        SelectedDesignConfig.ItemConfigs.Add(newItemConfig);
+        int indx = SelectedItemConfig is object ? ItemConfigs.IndexOf(SelectedItemConfig) + 1 : ItemConfigs.Count;
+        ItemConfig newItemConfig = SelectedItemConfig is object && IsCtrlPressed ? SelectedItemConfig.Copy() : new ItemConfig();
+
+        ItemConfigs.Insert(indx ,newItemConfig);
+        SelectedDesignConfig.ItemConfigs.Insert(indx,newItemConfig);
         SelectedItemConfig = newItemConfig;
         DBConnector.AddItemConfig(newItemConfig);
         DBConnector.UpdateDesignConfig(SelectedDesignConfig);
+        EnqueueMessege(new Messege("Add Item Config successfilly", MessegeInfo.Notification, null));
     }
     private void OnDeleteItemConfig(object parameter)
     {
-        DBConnector.DeleteItemConfig(SelectedItemConfig);
-        SelectedDesignConfig.ItemConfigs.Remove(SelectedItemConfig);
-        ItemConfigs.Remove(SelectedItemConfig);
+        if (SelectedItemConfig is object)
+        {
+            DBConnector.DeleteItemConfig(SelectedItemConfig);
+            SelectedDesignConfig.ItemConfigs.Remove(SelectedItemConfig);
+            ItemConfigs.Remove(SelectedItemConfig);
+            EnqueueMessege(new Messege("Delete Item Config Config successfilly", MessegeInfo.Notification, null));
+        }
     }
     private void OnAddMagic(object parameter)
     {
         Magic newMagic = new Magic();
-        Magics.Add(newMagic);
-        SelectedItemConfig.Magics.Add(newMagic);
+        int indx = SelectedMagic is object ? Magics.IndexOf(SelectedMagic) + 1 : Magics.Count;
+        Magics.Insert(indx, newMagic);
+        SelectedItemConfig.Magics.Insert(indx, newMagic);
         SelectedMagic = newMagic;
         DBConnector.AddMagic(newMagic);
         DBConnector.UpdateItemConfig(SelectedItemConfig);
     }
     private void OnDeleteMagic(object parameter)
     {
-        DBConnector.DeleteMagic(SelectedMagic);
-        SelectedItemConfig.Magics.Remove(SelectedMagic);
-        Magics.Remove(SelectedMagic);
+        if (SelectedMagic is object)
+        {
+            DBConnector.DeleteMagic(SelectedMagic);
+            SelectedItemConfig.Magics.Remove(SelectedMagic);
+            Magics.Remove(SelectedMagic);
+        }
     }
-    
+
     private void OnDeleteMapping(object parameter)
     {
-        DBConnector.DeleteItemMapping(Mappings);
-        SelectedDesignConfig.ItemMappings.Clear();
-        Mappings.Clear();
-        DBConnector.UpdateDesignConfig(SelectedDesignConfig);
+        MessageBoxResult r = MessageBox.Show("Delete all Mappings ?", "Warning", MessageBoxButton.YesNo);
+        if (r == MessageBoxResult.Yes)
+        {
+            DBConnector.DeleteItemMapping(Mappings);
+            SelectedDesignConfig.ItemMappings.Clear();
+            Mappings.Clear();
+            DBConnector.UpdateDesignConfig(SelectedDesignConfig);
+            EnqueueMessege(new Messege("Delete Mapping successfilly", MessegeInfo.Notification, null));
+        }
     }
 
     private void OnCreateProfile(object parameter)
@@ -307,20 +373,28 @@ public class MainViewModel :  INotifyPropertyChanged
         Profiles.Add(newProfile);
         SelectedProfile = newProfile;
         DBConnector.AddProfile(newProfile);
+        EnqueueMessege(new Messege("Profile created successfilly", MessegeInfo.Notification, null));
 
     }
     private void OnSaveProfile(object parameter)
     {
         DBConnector.UpdateProfile(SelectedProfile);
+        EnqueueMessege(new Messege("Profile save successfilly", MessegeInfo.Notification, null));
     }
     private void OnDeleteProfile(object parameter)
     {
-        DBConnector.DeleteProfile(SelectedProfile);
-        Profiles.Remove(SelectedProfile);
+        MessageBoxResult r = MessageBox.Show("Delete this Profile ?", "Warning", MessageBoxButton.YesNo);
+        if (r == MessageBoxResult.Yes)
+        {
+            DBConnector.DeleteProfile(SelectedProfile);
+            Profiles.Remove(SelectedProfile);
+            EnqueueMessege(new Messege("Profile deleted successfilly", MessegeInfo.Notification, null));
+        }
     }
     private void OnCheckProfile(object parameter)
     {
-        if (WorkingMode && !IsBusy){
+        if (WorkingMode && !IsBusy)
+        {
             WorkingMode = false;
             return;
         }
@@ -338,20 +412,21 @@ public class MainViewModel :  INotifyPropertyChanged
         }
         else
         {
-            string f1 = SelectedProfile.FolderPath + Constants.artFolderName,
-                f2 = SelectedProfile.FolderPath + Constants.storageFolderName,
-                f3 = SelectedProfile.FolderPath + Constants.printAndCutFolderName,
-                f4 = SelectedProfile.FolderPath + Constants.dataFileName;
+            string f1 = SelectedProfile.FolderPath + LObjects.Constants.artFolderName,
+                f2 = SelectedProfile.FolderPath + LObjects.Constants.storageFolderName,
+                f3 = SelectedProfile.FolderPath + LObjects.Constants.printAndCutFolderName,
+                f4 = SelectedProfile.FolderPath + LObjects.Constants.dataFileName;
             if (!Directory.Exists(f1))
             {
                 Directory.CreateDirectory(f1);
                 EnqueueMessege(
                 new Messege("Created art folder.", MessegeInfo.Notification, null)
                 );
-            } else
+            }
+            else
             {
                 int i = 0;
-                if(MessageBox.Show("Delete all Created Arts ?", "Warning", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)
+                if (MessageBox.Show("Delete all Created Arts ?", "Warning", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)
                     foreach (string item in Directory.GetFiles(f1))
                     {
                         File.Delete(item);
@@ -438,6 +513,26 @@ public class MainViewModel :  INotifyPropertyChanged
             OnPropertyChanged(nameof(IsBusy));
         }
     }
+    private bool _AutoExportPC;
+    public bool AutoExportPC
+    {
+        get => _AutoExportPC;
+        set
+        {
+            _AutoExportPC = value;
+            OnPropertyChanged(nameof(AutoExportPC));
+        }
+    }
+    private bool _AutoRestartWork;
+    public bool AutoRestartWork
+    {
+        get => _AutoRestartWork;
+        set
+        {
+            _AutoRestartWork = value;
+            OnPropertyChanged(nameof(AutoRestartWork));
+        }
+    }
     public ConcurrentQueue<Messege> UniversalMesseges { get; }
     public void EnqueueMessege(Messege m)
     {
@@ -447,7 +542,6 @@ public class MainViewModel :  INotifyPropertyChanged
             OnPropertyChanged(nameof(UniversalMesseges));
         });
     }
-    public int MessegeIndex { get; set; }
     private int _ProgressIndex;
     public int ProgressIndex
     {
@@ -530,7 +624,7 @@ public class MainViewModel :  INotifyPropertyChanged
         _DoVerify.RunWorkerCompleted += RunWorkerCompletedHandler;
         _DoVerify.DoWork += StartVerify;
 
-        _MakeMapping= new BackgroundWorker();
+        _MakeMapping = new BackgroundWorker();
         _MakeMapping.WorkerReportsProgress = true;
         _MakeMapping.RunWorkerCompleted += RunWorkerCompletedHandler;
         _MakeMapping.DoWork += StartMakeMapping;
@@ -547,10 +641,28 @@ public class MainViewModel :  INotifyPropertyChanged
     private void StartMakeMapping(object sender, DoWorkEventArgs e)
     {
         EnqueueMessege(new Messege("Start Make Mappings", MessegeInfo.Notification, null));
-        List<ItemMapping> mappings = MainDriver.MakeMapping();
+        List<ItemMapping> mappings = null;
+
+
+        var dialog = new Microsoft.Win32.OpenFileDialog();
+        dialog.FileName = "Document";
+        dialog.Multiselect = false;
+
+        bool? result = dialog.ShowDialog();
+
+        // Process open file dialog box results
+        if (result == true)
+        {
+            mappings = MainDriver.MakeMapping(dialog.FileName);
+        }
+        else
+        {
+            mappings = MainDriver.MakeMapping();
+        }
+
         DBConnector.AddItemMapping(mappings);
-        SelectedDesignConfig.ItemMappings = mappings;
-        Mappings = new ObservableCollection<ItemMapping>(mappings);
+        SelectedDesignConfig.ItemMappings.AddRange(mappings);
+        Mappings = new ObservableCollection<ItemMapping>(SelectedDesignConfig.ItemMappings);
         DBConnector.UpdateDesignConfig(SelectedDesignConfig);
         EnqueueMessege(new Messege("Finish Make Mappings", MessegeInfo.Notification, null));
     }
@@ -590,12 +702,20 @@ public class MainViewModel :  INotifyPropertyChanged
     }
     private void StartCreatePrintAndCut(object sender, DoWorkEventArgs e)
     {
-        MainDriver.CreatePrintAndCut();
+        string today = Interaction.InputBox("Storage Folder by Session :");
+        MainDriver.CreatePrintAndCut(today, AutoExportPC);
     }
     private void OnVerify(object parameter) { }
     private void StartVerify(object sender, DoWorkEventArgs e) { }
     private void RunWorkerCompletedHandler(object sender, RunWorkerCompletedEventArgs e)
     {
+        if (e.Error != null)
+        {
+            EnqueueMessege(new Messege(e.Error.Message, MessegeInfo.Exception, null));
+            if (AutoExportPC)
+                ((BackgroundWorker)sender).RunWorkerAsync();
+        }
+
         IsBusy = false;
     }
 

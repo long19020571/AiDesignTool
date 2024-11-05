@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:local="clr-namespace:AiDesignTool"
         xmlns:lcommands="clr-namespace:AiDesignTool.LCommands"
         mc:Ignorable="d"
@@ -23,13 +24,13 @@
                 <Grid Grid.Row="0" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="80" />
-                        <ColumnDefinition Width="140"/>
-                        <ColumnDefinition Width="190"/>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="220"/>
                         <ColumnDefinition Width="30" />
                     </Grid.ColumnDefinitions>
                     <Label    Grid.Row="0" Grid.Column="0" Content="Profile :"/>
-                    <ComboBox x:Name="CBProfiles" Grid.Row="0" Grid.Column="1" Width="120" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" DisplayMemberPath="Name"/>
-                    <TextBox  Grid.Row="0" Grid.Column="2" Width="120" Text="{Binding SelectedProfile.Name, Mode=TwoWay}"/>
+                    <ComboBox x:Name="CBProfiles" Grid.Row="0" Grid.Column="1" Width="210" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" DisplayMemberPath="Name"/>
+                    <TextBox  Grid.Row="0" Grid.Column="2" Width="210" Text="{Binding SelectedProfile.Name, Mode=TwoWay}"/>
                     <Button   Grid.Row="0" Grid.Column="3" Width="30"  Content="📁"  Command="{Binding SelectProfileDirectory}"/>
                 </Grid>
                 <GroupBox Grid.Row="1" Header="Panel" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}">
@@ -104,9 +105,10 @@
                         <Label Grid.Column="3" Grid.ColumnSpan="2" Grid.Row="0" Content="ItemConfig"/>
                         <Label Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="0" Content="Magic"/>
                         <Label Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="3" Content="Mapping"/>
-
+                        
+                        
                         <ListView Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1" Grid.RowSpan="4" ItemsSource="{Binding DesignConfigs}" SelectedItem="{Binding SelectedDesignConfig}" DisplayMemberPath="Label"/>
-                        <DataGrid Grid.Column="3" Grid.ColumnSpan="2" Grid.Row="1" Grid.RowSpan="4" ItemsSource="{Binding ItemConfigs}"   SelectedItem="{Binding SelectedItemConfig, TargetNullValue={x:Static CollectionView.NewItemPlaceholder}}">
+                        <DataGrid x:Name="ItemConfigs" Grid.Column="3" Grid.ColumnSpan="2" Grid.Row="1" Grid.RowSpan="4" ItemsSource="{Binding ItemConfigs}" SelectedItem="{Binding SelectedItemConfig, TargetNullValue={x:Static CollectionView.NewItemPlaceholder}}" CanUserReorderColumns="False" SelectionChanged="DataGrid_SelectionChanged">
                             <DataGrid.Columns>
                                 <DataGridTextColumn     Header="Name"      Width="*" Binding="{Binding Name}" />
                                 <DataGridComboBoxColumn Header="Item Type" Width="*" ItemsSource="{Binding Source={StaticResource ItemType}}" SelectedItemBinding="{Binding ItemType}"/>
@@ -118,7 +120,7 @@
                                 <DataGridTextColumn     Header="Elements" Width="*" Binding="{Binding Elements}" />
                             </DataGrid.Columns>
                         </DataGrid>
-                        <ListView Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="4" ItemsSource="{Binding Mappings}" DisplayMemberPath="Values"/>
+                        <ListView Grid.Column="6" Grid.ColumnSpan="2" Grid.Row="4" ItemsSource="{Binding Mappings}" SelectedItem="{Binding SelectedItemMapping}" DisplayMemberPath="Values"/>
 
                         <Button Grid.Column="0" Grid.Row="6" Width="60"  Content="📄" FontSize="15" Command="{Binding AddDesignConfig }"/>
                         <Button Grid.Column="1" Grid.Row="6" Width="60"  Content="❌" FontSize="15" Command="{Binding DeleteDesignConfig }"/>
@@ -149,39 +151,55 @@
                         <Button       Grid.Row="2" Grid.Column="0" Content="Delete" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}" Command="{Binding DeleteProfile}"/>
                         <ToggleButton Grid.Row="3" Grid.Column="0" Content="Working Mode" IsChecked="{Binding WorkingMode, Mode=OneWayToSource}" Command="{Binding CheckProfile}"/>
 
-                        <Button       Grid.Row="0" Grid.Column="1" Content="Load Data" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding LoadData}"/>
-                        <Button       Grid.Row="1" Grid.Column="1" Content="Create Art" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding CreateArts}"/>
-                        <Button       Grid.Row="2" Grid.Column="1" Content="Create PC" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding CreatePrintAndCut}"/>
-                        <Button       Grid.Row="3" Grid.Column="1" Content="Verify 2" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding Verify}"/>
+                        <Button       Grid.Row="0" Grid.Column="1" Content="Load Data" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding LoadData}"/>
+                        <Button       Grid.Row="1" Grid.Column="1" Content="Create Art" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding CreateArts}"/>
+                        <Button       Grid.Row="2" Grid.Column="1" Content="Create PC" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding CreatePrintAndCut}"/>
+                        <Button       Grid.Row="3" Grid.Column="1" Content="Verify 2" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding Verify}"/>
 
                         <Button       Grid.Row="0" Grid.Column="2" Content="Signaling" IsEnabled="{Binding Flag, Mode=OneWay}" Command="{Binding Signaling}"/>
                         <Button       Grid.Row="1" Grid.Column="2" Content="Clear Session" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding ClearSession}"/>
                         <Button       Grid.Row="2" Grid.Column="2" Content="Pre-Load" IsEnabled="{Binding PreLoaded, Mode=OneWay}" Command="{Binding PreLoad}"/>
                         <Button       Grid.Row="3" Grid.Column="2" Content="Re-start Driver" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding DoWork}"/>
+                        <CheckBox     Grid.Row="0" Grid.Column="3" Content="Auto Export PC" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" IsChecked="{Binding AutoExportPC, Mode=TwoWay}"/>
+                        <CheckBox     Grid.Row="1" Grid.Column="3" Content="Auto Re-start Work" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" IsChecked="{Binding AutoRestartWork, Mode=TwoWay}"/>
+                        <Button       Grid.Row="2" Grid.Column="3" Content="Copy" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}" Command="{Binding Signaling}"/>
+                        <Button       Grid.Row="3" Grid.Column="3" Content="Paste" IsEnabled="{Binding NonWorkingMode, Mode=OneWay}" Command="{Binding ClearSession}"/>
                     </Grid>
                 </GroupBox>
             </Grid>
         </GroupBox>
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="30"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <RichTextBox Grid.Row="0" Margin="10" Padding="10" x:Name="RTBPublisher">
-            </RichTextBox>
-            <ProgressBar Grid.Row="1" Margin="10 0 10 0" Value="{Binding ProgressIndex}" Minimum="0" Maximum="{Binding Total}" Foreground="Aqua"/>
-            <TextBlock  Grid.Row="1" Text="{Binding ProgressPercentage, StringFormat='Progress: {0:F1} %'}"/>
-            <DataGrid Grid.Row="2" Margin="10" ItemsSource="{Binding Orders}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Id" Width="*" Binding="{Binding Id}"/>
-                    <DataGridTextColumn Header="Count" Width="*" Binding="{Binding Count}"/>
-                    <DataGridTextColumn Header="Type" Width="*" Binding="{Binding Label}"/>
-                    <DataGridTextColumn Header="Order Number" Width="*" Binding="{Binding OrderNumber}"/>
-                    <DataGridTextColumn Header="Data" Width="*" Binding="{Binding Data}"/>
-                </DataGrid.Columns>
-                
-            </DataGrid>
-        </Grid>
+
+        <TabControl Grid.Column="0" SelectedIndex="0">
+            <TabItem Header="Main">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="30"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <RichTextBox Grid.Row="0" Margin="10" Padding="10" x:Name="RTBPublisher"/>
+
+                    <ProgressBar Grid.Row="1" Margin="10 0 10 0" Value="{Binding ProgressIndex}" Minimum="0" Maximum="{Binding Total}" Foreground="Aqua"/>
+                    <TextBlock  Grid.Row="1" Text="{Binding ProgressPercentage, StringFormat='Progress: {0:F1} %'}"/>
+                    <DataGrid Grid.Row="2" Margin="10" ItemsSource="{Binding Orders}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Id" Width="*" Binding="{Binding Id}"/>
+                            <DataGridTextColumn Header="Count" Width="*" Binding="{Binding Count}"/>
+                            <DataGridTextColumn Header="Type" Width="*" Binding="{Binding Label}"/>
+                            <DataGridTextColumn Header="Order Number" Width="*" Binding="{Binding OrderNumber}"/>
+                            <DataGridTextColumn Header="Data" Width="*" Binding="{Binding Data}"/>
+                        </DataGrid.Columns>
+
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Graphics">
+                <Canvas Background="MintCream">
+                    <Ellipse Width="100" Height="150" Canvas.Left="60" Canvas.Top="60" Fill="Red"/>
+                </Canvas>
+            </TabItem>
+        </TabControl>
+        
+        
     </Grid>
 </Window>

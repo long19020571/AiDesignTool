@@ -1,19 +1,19 @@
-﻿using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Illustrator;
+using IllustratorManipulationLib;
 using LiteDB;
 using LObjects;
-using IllustratorManipulationLib;
-using Illustrator;
-using System.Text.RegularExpressions;
-using System.IO;
-using NetTopologySuite.Geometries.Utilities;
-using NetTopologySuite.Operation.Union;
-using NetTopologySuite.IO;
 using NetTopologySuite.Geometries;
-using System.IO.MemoryMappedFiles;
-using NetTopologySuite.Index.HPRtree;
+using NetTopologySuite.Geometries.Utilities;
+using NetTopologySuite.IO;
+using NetTopologySuite.Operation.Union;
+using SkiaSharp;
+using System.Data;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Xml.Linq;
 //using System.Windows.Controls;
 
 namespace AiDesignTool.LCommands
@@ -22,7 +22,7 @@ namespace AiDesignTool.LCommands
     {
         #region Ai Action
         static Wizard wizard;
-        static Application appRef;
+        static Illustrator.Application appRef;
         static IllustratorSaveOptions saveOption;
         static IllustratorSaveOptions cutSaveOption;
         static NoColor noColor;
@@ -51,11 +51,9 @@ namespace AiDesignTool.LCommands
         static MainDriver()
         {
             wizard = new Wizard();
-            //List<Arts> arts = new List<Arts>();
             allArts = new List<BaseArt>();
             allOrders = new List<Order>();
             allPanels = new List<LPanel>();
-
         }
         public static void ClearSession()
         {
@@ -78,8 +76,6 @@ namespace AiDesignTool.LCommands
             allMappedPolygons = new List<PolygonMaps>();
             for (int i = 0; i < c; ++i)
             {
-                //designConfigs.Add(i, dcfs[i]);
-                //sArts[i].DesignConfig = dcfs[i];
                 Arts arts = new Arts();
                 arts.DesignConfig = dcfs[i];
                 siArts.Add(arts);
@@ -135,7 +131,8 @@ namespace AiDesignTool.LCommands
         }
         public static bool StartDriver()
         {
-            appRef = new Application();
+            appRef = new Illustrator.Application();
+            appRef.UserInteractionLevel = AiUserInteractionLevel.aiDontDisplayAlerts;
             saveOption = new IllustratorSaveOptions();
             cutSaveOption = new IllustratorSaveOptions()
             {
@@ -153,29 +150,43 @@ namespace AiDesignTool.LCommands
             preset.DocumentUnits = AiRulerUnits.aiUnitsPoints;
             return true;
         }
+        public static bool EndDriver()
+        {
+            Marshal.FinalReleaseComObject(appRef);
+            Marshal.FinalReleaseComObject(saveOption);
+            Marshal.FinalReleaseComObject(cutSaveOption);
+            Marshal.FinalReleaseComObject(noColor);
+            Marshal.FinalReleaseComObject(cutColor);
+            Marshal.FinalReleaseComObject(captureOptions);
+            Marshal.FinalReleaseComObject(preset);
+
+            ClearSession();
+            return true;
+        }
         #endregion
         public static IEnumerable<Order> LoadOrder()
         {
             List<Order> ordes = new List<Order>();
             string[] lines = File.ReadAllLines(WorkingFolder + Constants.dataFileName);
-            
+
             AddMessege(new Messege("There are " + lines.Length + " lines in Data File", MessegeInfo.Notification, null));
             ProgressMessege(false, lines.Length);
-            for(int i = 0; i < lines.Length; ++i)
+            for (int i = 0; i < lines.Length; ++i)
             {
                 string[] paras = lines[i].Split(Constants.REGEX_DATA_FILE_COLUMN);
                 if (paras.Length != 4)
                 {
                     AddMessege(new Messege("Wrong format data at line :" + i, MessegeInfo.Error, null));
                     return null;
-                } else
+                }
+                else
                 {
                     ordes.Add(new Order(paras));
                 }
                 ProgressMessege(true, i + 1);
             }
             allOrders = ordes;
-            return ordes; 
+            return ordes;
         }
         private static bool LoadArt(Order order)
         {
@@ -198,9 +209,9 @@ namespace AiDesignTool.LCommands
         public static bool LoadArts()
         {
             ProgressMessege(false, allOrders.Count);
-            for(int i = 0; i < allOrders.Count; ++i)
+            for (int i = 0; i < allOrders.Count; ++i)
             {
-                if(!LoadArt(allOrders[i]))
+                if (!LoadArt(allOrders[i]))
                 {
                     AddMessege(new Messege("Data and Config are mismatch :" + allOrders[i].AsString(), MessegeInfo.Error, null));
                     return false;
@@ -213,21 +224,23 @@ namespace AiDesignTool.LCommands
         {
             int c = dc.ItemConfigs.Count, count = 0;
             dynamic[] objs = new dynamic[c];
+            dynamic item = null;
             for (int j = 1; j <= docRef.PageItems.Count && count < c; j++)
             {
-                dynamic item = docRef.PageItems[j];
+                item = docRef.PageItems[j];
                 string name = item.Name;
-                if(name == string.Empty)
+                if (name == string.Empty)
                     continue;
                 for (int i = 0; i < dc.ItemConfigs.Count; i++)
                 {
-                    if(name.Equals(dc.ItemConfigs[i].Name))
+                    if (name.Equals(dc.ItemConfigs[i].Name))
                     {
                         ++count;
                         objs[i] = item;
                         break;
                     }
                 }
+                
             }
             if (count != dc.ItemConfigs.Count)
                 return null;
@@ -247,53 +260,73 @@ namespace AiDesignTool.LCommands
                 if (ats.ArtQueue.Count == 0)
                     continue;
                 AddMessege(new Messege("Start Create Art : " + dc.Label, MessegeInfo.Notification, null));
-                
 
-                List<dynamic> mergeObjs = null;
+
                 Document docRef = null;
-
                 docRef = appRef.Open(dc.FilePath);
-                mergeObjs = new List<dynamic>(merge(dc, docRef));
+                List<dynamic> mergeObjs = new List<dynamic>(merge(dc, docRef));
+                List<string> mergeNames = mergeObjs.Select(o => (string)o.Name).ToList();
 
+                dynamic[] refI = new dynamic[Constants.COUNT_REF];
+                dynamic[] originI = new dynamic[mergeObjs.Count];
+                for (int i = 1; i <= docRef.PageItems.Count; ++i)
+                {
+                    dynamic tmp = docRef.PageItems[i];
+                    string tmpName;
+                    try
+                    {
+                        tmpName = tmp.Name;
+                    } catch
+                    {
+                        continue;
+                    }
+                    int index1 = Constants.REF_LIST.IndexOf(tmpName),
+                        index2 = mergeNames.IndexOf(tmpName);
+                    if (index1 > -1)
+                    {
+                        tmp.Hidden = true;
+                        refI[index1] = tmp;
+                    }
+                    if (index2 > -1)
+                    {
+                        originI[index2] = tmp;
+                        tmp.Hidden = true;
+                    }
+                    tmp = null;
+                }
                 while (ats.ArtQueue.Count > 0)
                 {
-                    BaseArt art = ats.ArtQueue.Dequeue();
+                    BaseArt art = ats.ArtQueue.ElementAt(0);
                     dynamic[] copyI = new dynamic[mergeObjs.Count];
-                    dynamic[] refI = new dynamic[3];
                     for (int i = 0; i < mergeObjs.Count; ++i)
                     {
-                        dynamic tmp = mergeObjs[i];
-                        string tmpName = tmp.Name;
-                        copyI[i] = tmp.Duplicate();
-                        tmp.Hidden = true;
-                        if (tmpName.Equals(Constants.REF_LEFT))
-                            refI[0] = tmp;
-                        else if (tmpName.Equals(Constants.REF_BOT))
-                            refI[1] = tmp;
-                        else if (tmpName.Equals(Constants.REF_RIGHT))
-                            refI[2] = tmp;
+                        copyI[i] = originI[i].Duplicate();
+                        copyI[i].Hidden = false;
                     }
                     for (int i = 0; i < copyI.Length; ++i)
                     {
-                        dynamic item = copyI[i];
-                        item.Hidden = false;
                         ItemConfig ic = dc.ItemConfigs[i];
                         for (int j = 0; j < ic.Magics.Count; ++j)
                         {
-                            item = DoMagic(item, art.Values[i], plgMaps, ic.Magics[j], refI);
+                            copyI[i] = DoMagic(docRef , copyI[i], art.Values[i], plgMaps, ic.Magics[j], refI);
                         }
-                        copyI[i] = item;
+                        //Marshal.ReleaseComObject(item);
+                        //item = null;
                     }
                     string savePath = WorkingFolder + Constants.artFolderName + "\\" + art.Id.ToString("D8") + "_" + dc.Label + ".ai";
                     art.FilePath = savePath;
                     docRef.SaveAs(savePath, saveOption);
 
+
                     for (int i = 0; i < copyI.Length; ++i)
                     {
-                        copyI[i].Selected = true;
-                        copyI[i].Delete();
+                        try
+                        {
+                            copyI[i].Delete();
+                        } catch { }
                     }
 
+                    ats.ArtQueue.Dequeue();
                     allArts.Add(art);
                     p++;
                     ProgressMessege(true, p);
@@ -301,12 +334,20 @@ namespace AiDesignTool.LCommands
                 }
                 docRef.Close(AiSaveOptions.aiDoNotSaveChanges);
 
+                Marshal.CleanupUnusedObjectsInCurrentContext();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+
                 AddMessege(new Messege("Finish Create Art : " + dc.Label, MessegeInfo.Notification, null));
             }
             return true;
         }
-        public static bool CreatePrintAndCut()
+        public static bool CreatePrintAndCut(string sessionFolder, bool AutoExportPC)
         {
+            string storage = WorkingFolder + Constants.storageFolderName + sessionFolder + "\\";
+            if (!Directory.Exists(storage))
+                Directory.CreateDirectory(storage);
+
             AddMessege(new Messege("Start Create print and cut files.", MessegeInfo.Notification, null));
             ProgressMessege(false, allArts.Count);
             allArts.Sort(delegate (BaseArt f1, BaseArt f2)
@@ -314,41 +355,42 @@ namespace AiDesignTool.LCommands
                 return f1.Id.CompareTo(f2.Id);
             });
 
-            int artCount = allArts.Count,
-            label = 0, i = 0;
+            int label = 0;
 
             int maxCount = TemplatePanel.CountMaxArt();
 
-            while (i < artCount)
+            while (true)
             {
+                int artCount = allArts.Count;
+                if (artCount <= 0)
+                    break;
+                int i = 0;
                 Document docRef = appRef.Documents.AddDocument("preset", preset);
 
                 LPanel panel = TemplatePanel.CopyConfig();
-                int j = 0;
                 List<GroupItem> groups = new List<GroupItem>();
-                while (j < maxCount && i < artCount)
+                while (i < maxCount && i < artCount)
                 {
                     panel.ContainArts.Add(allArts[i]);
                     GroupItem pItem = docRef.GroupItems.CreateFromFile(allArts[i].FilePath);
                     groups.Add(pItem);
-                    double[] pos = panel.GetPosition(j);
-                    pItem.Position = new object[] { pos[0], - pos[1] };
-                    ++j; ++i;
+                    double[] pos = panel.GetPosition(i);
+                    pItem.Position = new object[] { pos[0], -pos[1] };
+                    ++i;
                     ProgressMessege(true, i);
                 }
                 List<BaseArt> errors = CheckPlacedItem(groups, panel.ContainArts);
-                if(errors.Count > 0)
+                if (errors.Count > 0)
                 {
                     string[] errorss = errors.Select(e => string.Join(",", e.Values)).ToArray();
                     AddMessege(new Messege("Try to fix Errors Art: ", MessegeInfo.Unhandled, errors));
                     WavingFlags(true);
                     ControlSignal.WaitOne();
-
                 }
 
                 double[] ll = panel.GetRectId(), bb = panel.GetRectBoundary();
                 TextFrame sign = docRef.TextFrames.Add();
-                sign.Contents = panel.PrintId.ToString();
+                sign.Contents = label.ToString();
                 GroupItem signP = sign.CreateOutline();
                 signP.Width = ll[2]; signP.Height = ll[3];
                 signP.Position = new object[] { ll[0], ll[1] };
@@ -359,8 +401,17 @@ namespace AiDesignTool.LCommands
                 border.StrokeColor = cutColor;
 
 
-                docRef.SaveAs(WorkingFolder + Constants.storageFolderName + "File_All_" + panel.PrintId.ToString() + ".ai", saveOption);
+                docRef.SaveAs(storage + "File_All_" + label.ToString() + ".ai", saveOption);
 
+                //
+                allPanels.Add(panel);
+                allArts.RemoveRange(0, i);
+
+                AddMessege(new Messege("Created panel : " + label, MessegeInfo.Notification, null));
+                label++;
+                if (!AutoExportPC)
+                    continue;
+                //
                 appRef.ExecuteMenuCommand("deselectall");
                 border.Selected = true;
                 appRef.ExecuteMenuCommand("Find Stroke Color menu item");
@@ -380,7 +431,7 @@ namespace AiDesignTool.LCommands
 
                 appRef.ExecuteMenuCommand("Fit Artboard to artwork bounds");
 
-                docRef.ImageCapture(WorkingFolder + Constants.printAndCutFolderName + panel.PrintId.ToString() + "_In.PNG", null, captureOptions);
+                docRef.ImageCapture(storage + label.ToString() + "_In.PNG", null, captureOptions);
 
                 border.Selected = true;
                 signP.Selected = true;
@@ -399,18 +450,17 @@ namespace AiDesignTool.LCommands
                     }
                     catch { continue; }
                 }
-                allPanels.Add(panel);
-                docRef.SaveAs(WorkingFolder + Constants.printAndCutFolderName + "File_Cut_" + label.ToString() + ".ai", cutSaveOption);
+                docRef.SaveAs(storage + "File_Cut_" + label.ToString() + ".ai", cutSaveOption);
                 docRef.Close();
 
-                allArts.RemoveRange(0, i);
-
-                AddMessege(new Messege("Created panel :" + label, MessegeInfo.Notification, null));
+                Marshal.CleanupUnusedObjectsInCurrentContext();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
             }
             return true;
         }
         public static bool Verify()
-            { return true; }
+        { return true; }
         public static List<BaseArt> CheckPlacedItem(List<GroupItem> groupItems, List<BaseArt> arts)
         {
             List<BaseArt> errors = new List<BaseArt>();
@@ -446,10 +496,10 @@ namespace AiDesignTool.LCommands
             }
             return errors;
         }
-        public static dynamic DoMagic(dynamic input, string values , PolygonMaps maps, Magic magic, dynamic[] refItem)
+        public static dynamic DoMagic(Document docRef, dynamic input, string values, PolygonMaps maps, Magic magic, dynamic[] refItem)
         {
             string elements = magic.Elements;
-            switch(magic.Spell)
+            switch (magic.Spell)
             {
                 case Spell.None:
                     {
@@ -457,7 +507,7 @@ namespace AiDesignTool.LCommands
                     }
                 case Spell.ShowAllText:
                     {
-                        if(input is TextFrame tf)
+                        if (input is TextFrame tf)
                         {
                             TextRange tr = tf.TextRange;
                             int l = values.Length;
@@ -497,51 +547,85 @@ namespace AiDesignTool.LCommands
                         }
                         break;
                     }
+                case Spell.CreateOutlineText:
+                    {
+                        if (input is TextFrame tf)
+                        {
+                            input = tf.CreateOutline();
+                        }
+                        break;
+                    }
+                case Spell.Rotate:
+                    {
+                        break;
+                    }
+                case Spell.MoveToTouch:
+                    {
+                        break;
+                    }
                 case Spell.StickTextTogether:
                     {
                         if (input is TextFrame tf)
                         {
                             double _move = double.Parse(elements);
-                            double[] pos =
-                                {
-                                    tf.Position[0] + tf.Width/2,
-                                    tf.Position[1] - tf.Height/2
-                                };
                             string s = null, tfname = tf.Name;
                             while (s is null)
                                 s = tf.Contents;
 
                             GroupItem gi = tf.CreateOutline();
 
+                            double[] pos =
+                                {
+                                    gi.Position[0] + gi.Width/2,
+                                    gi.Position[1] - gi.Height/2
+                                };
                             int c = s.Length;
-                            double scl;
-                            List<CompoundPathItem> cpis = new List<CompoundPathItem>();
-                            List<Polygon> plgs = new List<Polygon>();
-                            for (int i = c; i > 0; --i)
+                            double sclw, sclh, minArea = 10;
+
+                            CompoundPathItem[] cpis = new CompoundPathItem[c];
+                            Polygon[] plgs = new Polygon[c];
+                            double[] distances = new double[c];
+                            Array.Fill(distances, 0.0);
+                            for (int i = 0, t = c; i < c; ++i)
                             {
-                                CompoundPathItem item = gi.CompoundPathItems[i];
-                                cpis.Add(item);
-                                Polygon tmpplg = maps.Find(s[c - i].ToString());
-                                scl = item.Width / tmpplg.EnvelopeInternal.Width;
-                                AffineTransformation scaler = AffineTransformation.ScaleInstance(scl, scl);
-                                plgs.Add(wizard.moveTo((Polygon)scaler.Transform(tmpplg), item.Position[0], item.Position[1], PositionReference.TopLeft));
+                                if (s[i] == ' ')
+                                    continue;
+                                CompoundPathItem item = gi.CompoundPathItems[t];
+                                cpis[i] = item;
+                                Polygon tmpplg = maps.Find(s[i].ToString());
+                                sclw = item.Width / tmpplg.EnvelopeInternal.Width;
+                                sclh = item.Height / tmpplg.EnvelopeInternal.Height;
+                                AffineTransformation scaler = AffineTransformation.ScaleInstance(sclw, sclh);
+                                plgs[i] = (wizard.moveTo((Polygon)scaler.Transform(tmpplg), item.Position[0], item.Position[1], PositionReference.TopLeft));
+                                --t;
                             }
                             AffineTransformation mover = AffineTransformation.TranslationInstance(-_move, 0);
                             for (int i = 0; i < c - 1; ++i)
                             {
-                                double delta = 0;
-                                while (!plgs[i].Intersects(plgs[i + 1]))
+                                if (plgs[i] == null || plgs[i + 1] == null)
+                                    continue;
+                                plgs[i] = (Polygon)plgs[i];
+                                plgs[i + 1] = (Polygon)plgs[i + 1];
+                                while (plgs[i].Intersection(plgs[i + 1]).Area < minArea)
                                 {
-                                    plgs[i + 1] = (Polygon)mover.Transform(plgs[i + 1]);
-                                    delta -= _move;
+                                    for (int u = i + 1; u < c; ++u)
+                                    {
+                                        plgs[u] = (Polygon)mover.Transform(plgs[u]);
+                                        distances[u] -= _move;
+                                    }
                                 }
+                            }
+                            for (int i = 0; i < c; ++i)
+                            {
+                                if (distances[i] == 0)
+                                    continue;
                                 object[] ps =
                                 {
-                                    cpis[i +1].Position[0] + delta, cpis[i +1].Position[1]
+                                    cpis[i].Position[0] + distances[i], cpis[i ].Position[1]
                                 };
-                                cpis[i + 1].Position = ps;
+                                cpis[i].Position = ps;
                             }
-                            tf.Application.ExecuteMenuCommand("deselectall");
+                            docRef.Application.ExecuteMenuCommand("deselectall");
                             object[] pos2 =
                             {
                                 pos[0] - gi.Width/2,
@@ -551,18 +635,18 @@ namespace AiDesignTool.LCommands
                             gi.Selected = true;
                             gi.Name = tfname;
                             Thread.Sleep(100);
-                            tf.Application.ExecuteMenuCommand("Live Pathfinder Add");
-                            tf.Application.ExecuteMenuCommand("expandStyle");
+                            docRef.Application.ExecuteMenuCommand("Live Pathfinder Add");
+                            docRef.Application.ExecuteMenuCommand("expandStyle");
                             Polygon groupedPlg = (Polygon)wizard.moveTo((Polygon)CascadedPolygonUnion.Union(plgs.Cast<Geometry>().ToArray()), pos[0], pos[1], PositionReference.MiddleCenter);
 
                             maps.ForceAdd(new MappedPolygon(tfname, groupedPlg));
 
+
                             for (int i = 0; i < tf.Application.Selection.Length; ++i)
                             {
-                                dynamic a = tf.Application.Selection[i];
-                                if (a is GroupItem groupItem)
+                                if (tf.Application.Selection[i] is object item)
                                 {
-                                    return groupItem;
+                                    return item;
                                 }
                             }
                         }
@@ -570,56 +654,94 @@ namespace AiDesignTool.LCommands
                     }
                 case Spell.FitPathInsize:
                     {
-                        
+
                         break;
                     }
                 case Spell.StickPathTo:
                     {
                         string[] es = elements.Split(Constants.REGEX_DATA_FILE_DATA);
                         double _move = double.Parse(es[0]), minWidth = double.Parse(es[1]);
+                        double scl00 = 0.25, scl01 = 0.25, scl10 = 1.05, scl11 = 1.05;
+                        double sK1 = 0.25, sK2 = 1.025;
+                        if (es[2].Equals("00"))
+                        {
+                            scl00 = sK1; scl01 = sK1; scl10 = sK2; scl11 = sK2;
+                        }
+                        else if (es[2].Equals("01"))
+                        {
+                            scl00 = sK1; scl01 = 1; scl10 = sK2; scl11 = 1;
+                        }
+                        else if (es[2].Equals("10"))
+                        {
+                            scl00 = 1; scl01 = sK1; scl10 = 1; scl11 = sK2;
+                        }
                         Polygon lRef, bRef, rRef, plgItem;
                         string itemName = input.Name;
-                        lRef = maps.Find(Constants.REF_LEFT);
-                        bRef = maps.Find(Constants.REF_BOT);
-                        rRef = maps.Find(Constants.REF_RIGHT);
+                        lRef = maps.Find(Constants.REF_LIST[0]);
+                        bRef = maps.Find(Constants.REF_LIST[1]);
+                        rRef = maps.Find(Constants.REF_LIST[2]);
                         plgItem = maps.Find(itemName);
 
-                        dynamic ilRef = refItem[0], ibRel = refItem[1], irRef = refItem[2];
-
-
-                        lRef = wizard.moveTo(lRef, ilRef.Position[0], ilRef.Position[1], PositionReference.TopLeft);
-                        bRef = wizard.moveTo(bRef, ibRel.Position[0], ibRel.Position[1], PositionReference.TopLeft);
-                        rRef = wizard.moveTo(rRef, irRef.Position[0], irRef.Position[1], PositionReference.TopLeft);
+                        lRef = wizard.moveTo(lRef, refItem[0].Position[0], refItem[0].Position[1], PositionReference.TopLeft);
+                        bRef = wizard.moveTo(bRef, refItem[1].Position[0], refItem[1].Position[1], PositionReference.TopLeft);
+                        rRef = wizard.moveTo(rRef, refItem[2].Position[0], refItem[2].Position[1], PositionReference.TopLeft);
                         plgItem = wizard.moveTo(plgItem, input.Position[0], input.Position[1], PositionReference.TopLeft);
 
-                        //double[] pos = getPosition(plgItem, PositionReference.MiddleCenter);
-
-
-
-                        //Geometry dLeft, dRight;
                         double dLeft, dRight, dBottom, itemWidth = input.Width;
-                        double scl = 1;
+                        double scl = 1, minArea = 10;
                         if (itemWidth > minWidth)
                         {
-                            AffineTransformation scaler1 = AffineTransformation.ScaleInstance(0.25, 1);
+                            AffineTransformation scaler1 = AffineTransformation.ScaleInstance(scl00, scl01);
                             double[] oldP1 = wizard.getPosition(plgItem, PositionReference.MiddleCenter);
                             plgItem = (Polygon)scaler1.Transform(plgItem);
                             plgItem = wizard.moveTo(plgItem, oldP1[0], oldP1[1], PositionReference.MiddleCenter);
 
-                            AffineTransformation scaler = AffineTransformation.ScaleInstance(1.05, 1);
+                            AffineTransformation scaler = AffineTransformation.ScaleInstance(scl10, scl11);
                             while (true)
                             {
+                                //dLeft = plgItem.Distance(lRef);
+                                //dRight = plgItem.Distance(rRef);
+
+                                //if (dLeft == double.NegativeZero && dRight == double.NegativeZero)
+                                //{
+                                //    break;
+                                //}
+                                //double[] oldP = wizard.getPosition(plgItem, PositionReference.MiddleCenter);
+                                //plgItem = (Polygon)scaler.Transform(plgItem);
+                                //plgItem = wizard.moveTo(plgItem, oldP[0], oldP[1], PositionReference.MiddleCenter);
+                                //plgItem = wizard.move(plgItem, (dRight - dLeft) / 2, 0);
+                                ////
                                 dLeft = plgItem.Distance(lRef);
                                 dRight = plgItem.Distance(rRef);
 
                                 if (dLeft == double.NegativeZero && dRight == double.NegativeZero)
                                 {
+                                    //while(true)
+                                    //{
+                                    //    dLeft = plgItem.Intersection(lRef).Area;
+                                    //    dRight = plgItem.Intersection(rRef).Area;
+                                    //    if (dLeft > minArea && dRight > minArea)
+                                    //    {
+                                    //        break;
+                                    //    }
+                                    //    double[] _oldP = wizard.getPosition(plgItem, PositionReference.MiddleCenter);
+                                    //    plgItem = (Polygon)scaler.Transform(plgItem);
+                                    //    plgItem = wizard.moveTo(plgItem, _oldP[0], _oldP[1], PositionReference.MiddleCenter);
+                                    //    plgItem = wizard.move(plgItem, _move * (dLeft - dRight) / (dLeft > dRight ? dLeft : dRight), 0);
+
+                                    //}
+                                    double[] _oldP = wizard.getPosition(plgItem, PositionReference.MiddleCenter);
+                                    plgItem = (Polygon)scaler.Transform(plgItem);
+                                    plgItem = wizard.moveTo(plgItem, _oldP[0], _oldP[1], PositionReference.MiddleCenter);
+
                                     break;
                                 }
                                 double[] oldP = wizard.getPosition(plgItem, PositionReference.MiddleCenter);
                                 plgItem = (Polygon)scaler.Transform(plgItem);
                                 plgItem = wizard.moveTo(plgItem, oldP[0], oldP[1], PositionReference.MiddleCenter);
                                 plgItem = wizard.move(plgItem, (dRight - dLeft) / 2, 0);
+
+                                
                             }
                         }
                         else if (itemWidth <= minWidth)
@@ -643,10 +765,163 @@ namespace AiDesignTool.LCommands
                             pos[0],pos[1]
                         };
                         input.Position = poso;
+
+                        
                         break;
                     }
-                case Spell.Rotate:
+                case Spell.MirrorSnowFlake:
                     {
+
+                        Polygon lRef, bRef, rRef, tRef, plgItem;
+                        string itemName = input.Name;
+                        lRef = maps.Find(Constants.REF_LIST[0]);
+                        bRef = maps.Find(Constants.REF_LIST[1]);
+                        rRef = maps.Find(Constants.REF_LIST[2]);
+                        tRef = maps.Find(Constants.REF_LIST[3]);
+                        plgItem = maps.Find(itemName);
+
+                        dynamic ilRef = refItem[0], ibRel = refItem[1], irRef = refItem[2].Duplicate(), itRef = refItem[3];
+
+                        lRef = wizard.moveTo(lRef, ilRef.Position[0], ilRef.Position[1], PositionReference.TopLeft);
+                        bRef = wizard.moveTo(bRef, ibRel.Position[0], ibRel.Position[1], PositionReference.TopLeft);
+                        rRef = wizard.moveTo(rRef, irRef.Position[0], irRef.Position[1], PositionReference.TopLeft);
+                        tRef = wizard.moveTo(tRef, itRef.Position[0], itRef.Position[1], PositionReference.TopLeft);
+                        plgItem = wizard.moveTo(plgItem, input.Position[0], input.Position[1], PositionReference.TopLeft);
+
+                        double dBottom, dLeft, dTop, dRight, _move = 2;
+                        while (true)
+                        {
+                            dBottom = plgItem.Distance(bRef);
+
+                            if (dBottom == double.NegativeZero)
+                            {
+                                break;
+                            }
+                            plgItem = wizard.move(plgItem, 0, -_move);
+                        }
+                        while (true)
+                        {
+                            dLeft = plgItem.Distance(lRef);
+
+                            if (dLeft == double.NegativeZero)
+                            {
+                                break;
+                            }
+                            plgItem = wizard.move(plgItem, -_move, 0);
+                        }
+                        double[] pos1 = wizard.getPosition(plgItem, PositionReference.BottomLeft);
+                        AffineTransformation scaler = AffineTransformation.ScaleInstance(1.05, 1.05);
+                        while (true)
+                        {
+                            dTop = plgItem.Distance(tRef);
+
+                            if (dTop == double.NegativeZero)
+                            {
+                                break;
+                            }
+                            plgItem = (Polygon)scaler.Transform(plgItem);
+                            plgItem = wizard.moveTo(plgItem, pos1[0], pos1[1], PositionReference.BottomLeft);
+                        }
+                        input.Width = plgItem.EnvelopeInternal.Width;
+                        input.Height = plgItem.EnvelopeInternal.Height;
+                        double[] pos2 = wizard.getPosition(plgItem, PositionReference.TopLeft);
+                        object[] poso =
+                        {
+                            pos2[0],pos2[1]
+                        };
+                        input.Position = poso;
+                        while (true)
+                        {
+                            dRight = plgItem.Distance(rRef);
+
+                            if (dRight == double.NegativeZero)
+                            {
+                                break;
+                            }
+                            rRef = wizard.move(rRef, -_move, 0);
+                        }
+
+                        irRef.Width = rRef.EnvelopeInternal.Width;
+                        irRef.Height = rRef.EnvelopeInternal.Height;
+                        double[] pos22 = wizard.getPosition(rRef, PositionReference.TopLeft);
+                        object[] poso2 =
+                        {
+                            pos22[0],pos22[1]
+                        };
+                        irRef.Position = poso2;
+                        dynamic main = input, main2 = irRef;
+                        GroupItem group = appRef.ActiveDocument.GroupItems.Add();
+                        main.Move(group, AiElementPlacement.aiPlaceInside);
+                        main2.Move(group, AiElementPlacement.aiPlaceInside);
+                        for (int i = Constants.REF_LIST_START_LINE; i <= Constants.REF_LIST_END_LINE; i++)
+                        {
+                            dynamic tmp = refItem[i];
+                            if (tmp == null)
+                                continue;
+                            Illustrator.Matrix km = wizard.getMatrix(refItem[i]);
+                            main = main.Duplicate();
+                            main.Transform(km, true, true, true, true, 1, AiTransformation.aiTransformDocumentOrigin);
+                            main.Move(group, AiElementPlacement.aiPlaceInside);
+                            main2 = main2.Duplicate();
+                            main2.Transform(km, true, true, true, true, 1, AiTransformation.aiTransformDocumentOrigin);
+                            main2.Move(group, AiElementPlacement.aiPlaceInside);
+                        }
+                        input = group;
+                        break;
+                    }
+                case Spell.MoneyHolder1:
+                    {
+                        if (input is TextFrame tf)
+                        {
+                            GroupItem gr = tf.CreateOutline();
+                            double iW = gr.Width, iH = gr.Height;
+                            double phi = Math.Asin(iH / (3 * iW)) * (180/Math.PI);
+
+                            gr.Rotate(phi, true, false, false, false, AiTransformation.aiTransformCenter);
+                            wizard.Align(refItem[0], gr, Alignment.HorizontalLeft);
+                            wizard.Align(refItem[3], gr, Alignment.VerticalTop);
+
+                            GroupItem grD = gr.Duplicate();
+                            dynamic mer1 = refItem[Constants.REF_LIST_START_MERGE].Duplicate();
+                            mer1.Hidden = false;
+                            for (int i = 1; i <= gr.CompoundPathItems.Count; ++i)
+                            {
+                                CompoundPathItem cpi = gr.CompoundPathItems[i];
+                                for (int ii = 1; ii <= cpi.PathItems.Count; ++ii)
+                                {
+                                    PathItem p = cpi.PathItems[ii];
+
+                                            p.StrokeColor = cutColor;
+                                            //p.FillColor = noColor;
+                                            p.StrokeWidth = 16;
+                                            p.StrokeJoin = AiStrokeJoin.aiRoundEndJoin;
+
+                                }
+                            }
+
+                            gr.Selected = true;
+                            docRef.Application.ExecuteMenuCommand("OffsetPath v22");
+                            mer1.Move(gr, AiElementPlacement.aiPlaceAtBeginning);
+                            gr.Selected = true;
+                            //mer1.Selected = true;
+                            //docRef.Application.ExecuteMenuCommand("group");
+
+                            docRef.Application.ExecuteMenuCommand("Live Pathfinder Add");
+                            docRef.Application.ExecuteMenuCommand("expandStyle");
+
+
+                            grD.Selected = true;
+                            docRef.Application.ExecuteMenuCommand("ungroup");
+                            docRef.Application.ExecuteMenuCommand("group");
+                            for (int i = 1; i <= docRef.GroupItems.Count; ++i)
+                            {
+                                if (docRef.GroupItems[i].Selected)
+                                {
+                                    input = docRef.GroupItems[i];
+                                    break;
+                                }
+                            }
+                        }
                         break;
                     }
             }
@@ -681,25 +956,55 @@ namespace AiDesignTool.LCommands
                 ProgressMessege(true, i);
             }
             AddMessege(new Messege("Making TextFrame ...", MessegeInfo.Notification, null));
-            //for (int i = 1; i <= docRef.TextFrames.Count; ++i)
-            //{
-            TextFrame tf = docRef.TextFrames[1];
-            string s = tf.Contents;
-            GroupItem gi = tf.CreateOutline();
-
-            c = s.Length;
-            ProgressMessege(false, c -1);
-            for (int j = c; j > 0; --j)
+            for (int i = 1; i <= docRef.TextFrames.Count; ++i)
             {
-                CompoundPathItem pathItem = gi.CompoundPathItems[j];
-                ItemMapping im = new ItemMapping();
-                im.Values = s[c - j].ToString();
-                im.Polygons = wizard.Localize(pathItem);
-                items.Add(im);
-                ProgressMessege(true, c - j);
+
+                TextFrame tf = docRef.TextFrames[1];
+                string s = tf.Contents;
+                GroupItem gi = tf.CreateOutline();
+
+
+                docRef.Application.ExecuteMenuCommand("deselectall");
+                gi.Selected = true;
+                Thread.Sleep(100);
+                docRef.Application.ExecuteMenuCommand("Live Pathfinder Add");
+                docRef.Application.ExecuteMenuCommand("expandStyle");
+
+                c = s.Length;
+                ProgressMessege(false, c - 1);
+                for (int j = c; j > 0; --j)
+                {
+                    CompoundPathItem pathItem = gi.CompoundPathItems[j];
+                    ItemMapping im = new ItemMapping();
+                    im.Values = s[c - j].ToString();
+                    im.Polygons = wizard.Localize(pathItem);
+                    items.Add(im);
+                    ProgressMessege(true, c - j);
+                }
             }
-            //}
             return items;
+        }
+        public static List<ItemMapping> MakeMapping(string fontPath)
+        {
+            SKTypeface typeface = SKTypeface.FromFile(fontPath);
+            SKFont font = new SKFont(typeface);
+
+            List<ItemMapping> maps = new List<ItemMapping>();
+            for (char c = (char)0; c < (char)0xFFFF; c++)
+            {
+                if (typeface.ContainsGlyph(c))
+                {
+                    SKPath path = font.GetGlyphPath(typeface.GetGlyph(c));
+                    if (path != null && !path.IsEmpty)
+                    {
+                        ItemMapping im = new ItemMapping();
+                        im.Polygons = wizard.Localize(path);
+                        im.Values = c.ToString();
+                        maps.Add(im);
+                    }
+                }
+            }
+            return maps;
         }
         public static PolygonMaps LoadMapping(List<ItemMapping> mappings)
         {
@@ -715,23 +1020,28 @@ namespace AiDesignTool.LCommands
     public class DBConnector
     {
         public static readonly LiteDatabase db;
-        static DBConnector() {
+        static DBConnector()
+        {
             db = new LiteDatabase(@"Data.db");
         }
+        static void Dispose()
+        {
+            db?.Dispose();
+        }
         #region Profile Action
-        public static int AddProfile(Profile profile)
+        public static bool AddProfile(Profile profile)
         {
             AddDesignConfig(profile.DesignConfigs);
             AddPanel(profile.Panel);
             ILiteCollection<Profile> collection = db.GetCollection<Profile>("profiles");
-            return collection.Insert(profile);
+            return collection.Upsert(profile);
         }
         public static int AddProfile(IEnumerable<Profile> profiles)
         {
             AddDesignConfig(profiles.SelectMany(i => i.DesignConfigs));
             AddPanel(profiles.Select(i => i.Panel));
             ILiteCollection<Profile> collection = db.GetCollection<Profile>("profiles");
-            return collection.Insert(profiles);
+            return collection.Upsert(profiles);
         }
         public static Profile GetProfile(int id)
         {
@@ -799,17 +1109,17 @@ namespace AiDesignTool.LCommands
         }
         #endregion
         #region Panel Action
-        public static int AddPanel(LPanel panel)
+        public static bool AddPanel(LPanel panel)
         {
             AddArtConfig(panel.ArtConfig);
             ILiteCollection<LPanel> collection = db.GetCollection<LPanel>("panels");
-            return collection.Insert(panel);
+            return collection.Upsert(panel);
         }
         public static int AddPanel(IEnumerable<LPanel> panels)
         {
             AddArtConfig(panels.Select(i => i.ArtConfig));
             ILiteCollection<LPanel> collection = db.GetCollection<LPanel>("panels");
-            return collection.Insert(panels);
+            return collection.Upsert(panels);
         }
         public static LPanel GetPanel(int id)
         {
@@ -852,19 +1162,19 @@ namespace AiDesignTool.LCommands
         }
         #endregion
         #region DesignConfig Action
-        public static int AddDesignConfig(DesignConfig designconfigs)
+        public static bool AddDesignConfig(DesignConfig designconfigs)
         {
             AddItemMapping(designconfigs.ItemMappings);
             AddItemConfig(designconfigs.ItemConfigs);
             ILiteCollection<DesignConfig> collection = db.GetCollection<DesignConfig>("designconfigs");
-            return collection.Insert(designconfigs);
+            return collection.Upsert(designconfigs);
         }
         public static int AddDesignConfig(IEnumerable<DesignConfig> designconfigs)
         {
             AddItemMapping(designconfigs.SelectMany(i => i.ItemMappings));
             AddItemConfig(designconfigs.SelectMany(i => i.ItemConfigs));
             ILiteCollection<DesignConfig> collection = db.GetCollection<DesignConfig>("designconfigs");
-            return collection.Insert(designconfigs);
+            return collection.Upsert(designconfigs);
         }
         public static DesignConfig GetDesignConfig(int id)
         {
@@ -922,15 +1232,15 @@ namespace AiDesignTool.LCommands
         }
         #endregion
         #region ArtConfig Action OK
-        public static int AddArtConfig(ArtConfig artconfig)
+        public static bool AddArtConfig(ArtConfig artconfig)
         {
             ILiteCollection<ArtConfig> collection = db.GetCollection<ArtConfig>("artconfigs");
-            return collection.Insert(artconfig);
+            return collection.Upsert(artconfig);
         }
         public static int AddArtConfig(IEnumerable<ArtConfig> artconfigs)
         {
             ILiteCollection<ArtConfig> collection = db.GetCollection<ArtConfig>("artconfigs");
-            return collection.Insert(artconfigs);
+            return collection.Upsert(artconfigs);
         }
         public static ArtConfig GetArtConfig(int id)
         {
@@ -969,17 +1279,17 @@ namespace AiDesignTool.LCommands
         }
         #endregion
         #region ItemConfig Action OK
-        public static int AddItemConfig(ItemConfig itemconfig)
+        public static bool AddItemConfig(ItemConfig itemconfig)
         {
             AddMagic(itemconfig.Magics);
             ILiteCollection<ItemConfig> collection = db.GetCollection<ItemConfig>("itemconfigs");
-            return collection.Insert(itemconfig);
+            return collection.Upsert(itemconfig);
         }
         public static int AddItemConfig(IEnumerable<ItemConfig> itemconfigs)
         {
             AddMagic(itemconfigs.SelectMany(i => i.Magics));
             ILiteCollection<ItemConfig> collection = db.GetCollection<ItemConfig>("itemconfigs");
-            return collection.Insert(itemconfigs);
+            return collection.Upsert(itemconfigs);
         }
         public static ItemConfig GetItemConfig(int id)
         {
@@ -1022,15 +1332,15 @@ namespace AiDesignTool.LCommands
         }
         #endregion
         #region ItemMapping Action OK
-        public static int AddItemMapping(ItemMapping itemmapping)
+        public static bool AddItemMapping(ItemMapping itemmapping)
         {
             ILiteCollection<ItemMapping> collection = db.GetCollection<ItemMapping>("itemmappings");
-            return collection.Insert(itemmapping);
+            return collection.Upsert(itemmapping);
         }
         public static int AddItemMapping(IEnumerable<ItemMapping> itemmappings)
         {
             ILiteCollection<ItemMapping> collection = db.GetCollection<ItemMapping>("itemmappings");
-            return collection.Insert(itemmappings);
+            return collection.Upsert(itemmappings);
         }
         public static ItemMapping GetItemMapping(int id)
         {
@@ -1068,17 +1378,17 @@ namespace AiDesignTool.LCommands
             return collection.Update(itemmappings);
         }
         #endregion
-        
+
         #region Magic Action OK
-        public static int AddMagic(Magic magic)
+        public static bool AddMagic(Magic magic)
         {
             ILiteCollection<Magic> magics = db.GetCollection<Magic>("magics");
-            return magics.Insert(magic);
+            return magics.Upsert(magic);
         }
         public static int AddMagic(IEnumerable<Magic> magic)
         {
             ILiteCollection<Magic> magics = db.GetCollection<Magic>("magics");
-            return magics.Insert(magic);
+            return magics.Upsert(magic);
         }
         public static Magic GetMagic(int id)
         {
@@ -1116,10 +1426,5 @@ namespace AiDesignTool.LCommands
             return collection.Update(magics);
         }
         #endregion
-    }
-    public enum DataInteraction
-    {
-        Current,
-        Recursive
     }
 }

@@ -1,14 +1,9 @@
 ﻿using LObjects;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace AiDesignTool
 {
@@ -27,6 +22,8 @@ namespace AiDesignTool
 
             // Lắng nghe sự kiện PropertyChanged từ ViewModel
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+            KeyDown += App_KeyDown;
+            KeyUp += App_KeyUp;
         }
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -36,7 +33,7 @@ namespace AiDesignTool
                 while (ViewModel.UniversalMesseges.TryDequeue(out m))
                 {
                     Run r = new Run(new string(m.messege));
-                    switch(m.info)
+                    switch (m.info)
                     {
                         case MessegeInfo.Notification:
                             {
@@ -50,7 +47,7 @@ namespace AiDesignTool
                             }
                         case MessegeInfo.Error:
                             {
-                                r.Foreground= Brushes.Red;
+                                r.Foreground = Brushes.Red;
                                 break;
                             }
                         case MessegeInfo.Exception:
@@ -72,6 +69,29 @@ namespace AiDesignTool
                     RTBPublisher.Document.Blocks.Add(new Paragraph(r));
                     RTBPublisher.ScrollToEnd();
                 }
+            }
+        }
+
+        private void DataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            DataGrid dataGrid = sender as DataGrid;
+
+            var selectedItems = dataGrid.SelectedItems;
+
+            ViewModel.SelectedItemConfigs = selectedItems.Cast<ItemConfig>().ToList();
+        }
+        private void App_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.LeftCtrl)
+            {
+                ViewModel.IsCtrlPressed = true;
+            }
+        }
+        private void App_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.LeftCtrl)
+            {
+                ViewModel.IsCtrlPressed = false;
             }
         }
     }
