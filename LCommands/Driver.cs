@@ -183,6 +183,7 @@ namespace AiDesignTool.LCommands
                 {
                     ordes.Add(new Order(paras));
                 }
+                
                 ProgressMessege(true, i + 1);
             }
             allOrders = ordes;
@@ -191,19 +192,24 @@ namespace AiDesignTool.LCommands
         private static bool LoadArt(Order order)
         {
             Arts arts = siArts.FirstOrDefault(c => c.DesignConfig.Label == order.Label);
+            if (arts == null)
+                return false;
             DesignConfig dc = arts.DesignConfig;
             if (dc.Label != order.Label)
                 return false;
-            BaseArt art = new BaseArt();
-            art.DesignConfig = dc;
-            art.Values.Add(order.OrderNumber);
-            foreach (string ss in order.Data.Split(Constants.REGEX_DATA_FILE_DATA))
-                art.Values.Add(ss);
-            if (art.Values.Count != dc.CountItemConfig(ItemType.TextFrame))
+            for (int i = 0; i < order.Count; ++i)
             {
-                return false;
+                BaseArt art = new BaseArt();
+                art.DesignConfig = dc;
+                art.Values.Add(order.OrderNumber);
+                foreach (string ss in order.Data.Split(Constants.REGEX_DATA_FILE_DATA))
+                    art.Values.Add(ss);
+                if (art.Values.Count != dc.CountItemConfig(ItemType.TextFrame))
+                {
+                    return false;
+                }
+                arts.ArtQueue.Enqueue(art);
             }
-            arts.ArtQueue.Enqueue(art);
             return true;
         }
         public static bool LoadArts()
@@ -213,11 +219,12 @@ namespace AiDesignTool.LCommands
             {
                 if (!LoadArt(allOrders[i]))
                 {
-                    AddMessege(new Messege("Data and Config are mismatch :" + allOrders[i].AsString(), MessegeInfo.Error, null));
+                    AddMessege(new Messege("Data and Config are mismatch : " + allOrders[i].AsString(), MessegeInfo.Error, null));
                     return false;
                 }
                 ProgressMessege(true, i + 1);
             }
+            AddMessege(new Messege("Number of arts : " + allOrders.Count, MessegeInfo.Notification, null));
             return true;
         }
         private static IEnumerable<dynamic> merge(DesignConfig dc, Document docRef)
@@ -265,7 +272,10 @@ namespace AiDesignTool.LCommands
                 Document docRef = null;
                 docRef = appRef.Open(dc.FilePath);
                 List<dynamic> mergeObjs = new List<dynamic>(merge(dc, docRef));
-                List<string> mergeNames = mergeObjs.Select(o => (string)o.Name).ToList();
+                //List<string> mergeNames = mergeObjs.Select(o => (string)o.Name).ToList();
+                List<string> mergeNames = new List<string>();
+                for (int i = 0; i < mergeObjs.Count; ++i)
+                    mergeNames.Add((string)mergeObjs[i].Name);
 
                 dynamic[] refI = new dynamic[Constants.COUNT_REF];
                 dynamic[] originI = new dynamic[mergeObjs.Count];

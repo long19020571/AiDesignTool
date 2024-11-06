@@ -157,6 +157,14 @@ namespace LObjects
                     c++;
             return c;
         }
+        public DesignConfig Copy()
+        {
+            DesignConfig copy = new DesignConfig();
+            copy.Label = Label;
+            copy.FilePath = FilePath;
+            copy.ItemConfigs = ItemConfigs.Select(o => o.Copy()).ToList();
+            return copy;
+        }
     }
     public class BaseArt
     {
@@ -207,17 +215,10 @@ namespace LObjects
             ItemConfig copy = new ItemConfig();
             copy.Name = Name;
             copy.ItemType = ItemType;
-            copy.Magics = Magics;
+            copy.Magics = Magics.Select(o => o.Copy()).ToList();
             return copy;
         }
-        public ItemConfig Clone()
-        {
-            ItemConfig clone = new ItemConfig();
-            clone.Name = Name;
-            clone.ItemType = ItemType;
-            clone.Magics = Magics.Select(o => o.Copy()).ToList();
-            return clone;
-        }
+        
     }
     public class ItemMapping
     {
@@ -227,6 +228,13 @@ namespace LObjects
         public byte[] Polygons { get; set; }
         public ItemMapping()
         {
+        }
+        public ItemMapping Copy()
+        {
+            ItemMapping copy = new ItemMapping();
+            copy.Values = Values;
+            copy.Polygons = Polygons.ToArray();
+            return copy;
         }
     }
     public class MappedPolygon
@@ -310,6 +318,7 @@ namespace LObjects
         {
             Magic copy = new Magic();
             copy.Spell = Spell;
+            copy.Elements = new string(Elements);
             return copy;
         }
 

@@ -277,8 +277,8 @@ public class MainViewModel : INotifyPropertyChanged
         List<ItemMapping> mappings = null;
         if(CtrlPressed && IsDesignSelected)
         {
-            configs = SelectedDesignConfig.ItemConfigs;
-            mappings = SelectedDesignConfig.ItemMappings;
+            configs = SelectedDesignConfig.ItemConfigs.Select(o => o.Copy()).ToList();
+            mappings = SelectedDesignConfig.ItemMappings.Select(o => o.Copy()).ToList();
         }
         if (result == true)
         {
