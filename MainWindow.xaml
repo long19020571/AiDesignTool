@@ -11,7 +11,7 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="630"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <GroupBox Header="Controller" Margin="10" Padding="10" Grid.Column="1">
             <Grid >
@@ -197,6 +197,7 @@
                 <Canvas Background="MintCream">
                     <Ellipse Width="100" Height="150" Canvas.Left="60" Canvas.Top="60" Fill="Red"/>
                 </Canvas>
+
             </TabItem>
         </TabControl>
         

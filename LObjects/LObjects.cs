@@ -430,5 +430,17 @@ namespace LObjects
         public const int REF_LIST_START_MERGE = 19;
         public const int REF_LIST_END_MERGE = 20;
     }
+    public class GProfile
+    {
+        [BsonId]
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string GSheetId { get; set; }
+        public string GSheetRange { get; set; }
+        public string GDriveId { get; set; }
+        public GProfile()
+        {
 
+        }
+    }
 }

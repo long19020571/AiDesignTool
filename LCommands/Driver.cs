@@ -1027,6 +1027,10 @@ namespace AiDesignTool.LCommands
             return mppeds;
         }
     }
+    public class GGConnector
+    {
+
+    }
     public class DBConnector
     {
         public static readonly LiteDatabase db;
