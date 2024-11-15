@@ -7,7 +7,9 @@ using NetTopologySuite.Geometries.Utilities;
 using NetTopologySuite.IO;
 using NetTopologySuite.Operation.Union;
 using SkiaSharp;
+using System;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -21,13 +23,18 @@ namespace AiDesignTool.LCommands
     public static class MainDriver
     {
         #region Ai Action
+        static Process AiProcess;
+
         static Wizard wizard;
         static Illustrator.Application appRef;
         static IllustratorSaveOptions saveOption;
         static IllustratorSaveOptions cutSaveOption;
+        static ExportOptionsAutoCAD exportOptionsAutoCAD;
+        static ExportForScreensOptionsPNG24 exportForScreensOptions24;
+        static ExportForScreensItemToExport exportForScreensItemToExport;
+
         static NoColor noColor;
         static RGBColor cutColor;
-        static ImageCaptureOptions captureOptions;
         static DocumentPreset preset;
 
         //static List<Arts> sArts;
@@ -43,7 +50,7 @@ namespace AiDesignTool.LCommands
 
         static Action<Messege> AddMessege;
         static Action<bool, int> ProgressMessege;
-        static Action<bool> WavingFlags;
+        static Action<bool, Flag> WavingFlags;
 
         public static ManualResetEvent ControlSignal;
 
@@ -54,6 +61,7 @@ namespace AiDesignTool.LCommands
             allArts = new List<BaseArt>();
             allOrders = new List<Order>();
             allPanels = new List<LPanel>();
+            AiProcess = new Process();
         }
         public static void ClearSession()
         {
@@ -98,7 +106,7 @@ namespace AiDesignTool.LCommands
         {
             ProgressMessege = action;
         }
-        public static void SetWavingFlags(Action<bool> action)
+        public static void SetWavingFlags(Action<bool, Flag> action)
         {
             WavingFlags = action;
         }
@@ -129,26 +137,47 @@ namespace AiDesignTool.LCommands
             cutColor.Green = g;
             cutColor.Blue = b;
         }
+
         public static bool StartDriver()
         {
             appRef = new Illustrator.Application();
+            AiProcess = Process.GetProcessesByName("Illustrator")[0];
+            AiProcess.EnableRaisingEvents = true;
+            AiProcess.Exited += AiProcess_Exited;
+            while (AiProcess.MainWindowHandle == IntPtr.Zero)
+            {
+                Thread.Sleep(500);
+                AiProcess.Refresh();
+            }
+
             appRef.UserInteractionLevel = AiUserInteractionLevel.aiDontDisplayAlerts;
             saveOption = new IllustratorSaveOptions();
             cutSaveOption = new IllustratorSaveOptions()
             {
                 Compatibility = AiCompatibility.aiIllustrator8
             };
+            exportForScreensOptions24 = new ExportForScreensOptionsPNG24();
+            exportForScreensOptions24.ScaleType = AiExportForScreensScaleType.aiScaleByResolution;
+            exportForScreensOptions24.ScaleTypeValue = 300;
+            exportForScreensOptions24.Transparency = true;
+            exportForScreensItemToExport = new ExportForScreensItemToExport();
+            exportForScreensItemToExport.Document = true;
+            exportForScreensItemToExport.Artboards = null;
+
+            exportOptionsAutoCAD = new ExportOptionsAutoCAD();
+            exportOptionsAutoCAD.ExportFileFormat = AiAutoCADExportFileFormat.aiDXF;
+            exportOptionsAutoCAD.Unit = AiAutoCADUnit.aiMillimeters;
+            exportOptionsAutoCAD.UnitScaleRatio = 1.0;
+
             noColor = new NoColor();
-            captureOptions = new ImageCaptureOptions()
-            {
-                AntiAliasing = true,
-                Resolution = 300,
-                Transparency = true
-            };
             preset = new DocumentPreset();
             preset.DocumentColorSpace = AiDocumentColorSpace.aiDocumentRGBColor;
             preset.DocumentUnits = AiRulerUnits.aiUnitsPoints;
             return true;
+        }
+        private static void AiProcess_Exited(object? sender, EventArgs e)
+        {
+            WavingFlags(false, Flag.IsAiRunning);
         }
         public static bool EndDriver()
         {
@@ -157,7 +186,9 @@ namespace AiDesignTool.LCommands
             Marshal.FinalReleaseComObject(cutSaveOption);
             Marshal.FinalReleaseComObject(noColor);
             Marshal.FinalReleaseComObject(cutColor);
-            Marshal.FinalReleaseComObject(captureOptions);
+            Marshal.FinalReleaseComObject(exportForScreensOptions24);
+            Marshal.FinalReleaseComObject(exportForScreensItemToExport);
+            Marshal.FinalReleaseComObject(exportOptionsAutoCAD);
             Marshal.FinalReleaseComObject(preset);
 
             ClearSession();
@@ -174,15 +205,7 @@ namespace AiDesignTool.LCommands
             for (int i = 0; i < lines.Length; ++i)
             {
                 string[] paras = lines[i].Split(Constants.REGEX_DATA_FILE_COLUMN);
-                if (paras.Length != 4)
-                {
-                    AddMessege(new Messege("Wrong format data at line :" + i, MessegeInfo.Error, null));
-                    return null;
-                }
-                else
-                {
                     ordes.Add(new Order(paras));
-                }
                 
                 ProgressMessege(true, i + 1);
             }
@@ -202,9 +225,12 @@ namespace AiDesignTool.LCommands
                 BaseArt art = new BaseArt();
                 art.DesignConfig = dc;
                 art.Values.Add(order.OrderNumber);
-                foreach (string ss in order.Data.Split(Constants.REGEX_DATA_FILE_DATA))
-                    art.Values.Add(ss);
-                if (art.Values.Count != dc.CountItemConfig(ItemType.TextFrame))
+                if (order.Data != null)
+                {
+                    foreach (string ss in order.Data.Split(Constants.REGEX_DATA_FILE_DATA))
+                        art.Values.Add(ss);
+                }
+                if (art.Values.Count != dc.ItemConfigs.Count)
                 {
                     return false;
                 }
@@ -236,8 +262,9 @@ namespace AiDesignTool.LCommands
             {
                 item = docRef.PageItems[j];
                 string name = item.Name;
-                if (name == string.Empty)
+                if (name == string.Empty){
                     continue;
+                }
                 for (int i = 0; i < dc.ItemConfigs.Count; i++)
                 {
                     if (name.Equals(dc.ItemConfigs[i].Name))
@@ -268,11 +295,12 @@ namespace AiDesignTool.LCommands
                     continue;
                 AddMessege(new Messege("Start Create Art : " + dc.Label, MessegeInfo.Notification, null));
 
-
                 Document docRef = null;
                 docRef = appRef.Open(dc.FilePath);
+
+                double artWidth = docRef.Width, artHeight = docRef.Height;
+
                 List<dynamic> mergeObjs = new List<dynamic>(merge(dc, docRef));
-                //List<string> mergeNames = mergeObjs.Select(o => (string)o.Name).ToList();
                 List<string> mergeNames = new List<string>();
                 for (int i = 0; i < mergeObjs.Count; ++i)
                     mergeNames.Add((string)mergeObjs[i].Name);
@@ -307,6 +335,7 @@ namespace AiDesignTool.LCommands
                 while (ats.ArtQueue.Count > 0)
                 {
                     BaseArt art = ats.ArtQueue.ElementAt(0);
+                    art.Boundary[2] = artWidth; art.Boundary[3] = artHeight; 
                     dynamic[] copyI = new dynamic[mergeObjs.Count];
                     for (int i = 0; i < mergeObjs.Count; ++i)
                     {
@@ -335,7 +364,7 @@ namespace AiDesignTool.LCommands
                             copyI[i].Delete();
                         } catch { }
                     }
-
+                    
                     ats.ArtQueue.Dequeue();
                     allArts.Add(art);
                     p++;
@@ -344,7 +373,7 @@ namespace AiDesignTool.LCommands
                 }
                 docRef.Close(AiSaveOptions.aiDoNotSaveChanges);
 
-                Marshal.CleanupUnusedObjectsInCurrentContext();
+                Marshal.FinalReleaseComObject(docRef);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
 
@@ -365,9 +394,8 @@ namespace AiDesignTool.LCommands
                 return f1.Id.CompareTo(f2.Id);
             });
 
-            int label = 0;
 
-            int maxCount = TemplatePanel.CountMaxArt();
+            //int maxCount = TemplatePanel.CountMaxArt();
 
             while (true)
             {
@@ -379,12 +407,16 @@ namespace AiDesignTool.LCommands
 
                 LPanel panel = TemplatePanel.CopyConfig();
                 List<GroupItem> groups = new List<GroupItem>();
-                while (i < maxCount && i < artCount)
+                while (i < artCount)
                 {
-                    panel.ContainArts.Add(allArts[i]);
+
+                    double[] pos = panel.PlaceArt(allArts[i]);
+                    if (pos == null)
+                    {
+                        break;
+                    }
                     GroupItem pItem = docRef.GroupItems.CreateFromFile(allArts[i].FilePath);
                     groups.Add(pItem);
-                    double[] pos = panel.GetPosition(i);
                     pItem.Position = new object[] { pos[0], -pos[1] };
                     ++i;
                     ProgressMessege(true, i);
@@ -393,14 +425,14 @@ namespace AiDesignTool.LCommands
                 if (errors.Count > 0)
                 {
                     string[] errorss = errors.Select(e => string.Join(",", e.Values)).ToArray();
-                    AddMessege(new Messege("Try to fix Errors Art: ", MessegeInfo.Unhandled, errors));
-                    WavingFlags(true);
+                    AddMessege(new Messege("Try to fix Errors Art: ", MessegeInfo.Unhandled, errorss));
+                    WavingFlags(true, Flag.SignalFlag);
                     ControlSignal.WaitOne();
                 }
 
-                double[] ll = panel.GetRectId(), bb = panel.GetRectBoundary();
+                double[] ll = panel.GetRectId(), bb = panel.Boundary;
                 TextFrame sign = docRef.TextFrames.Add();
-                sign.Contents = label.ToString();
+                sign.Contents = panel.PrintId.ToString();
                 GroupItem signP = sign.CreateOutline();
                 signP.Width = ll[2]; signP.Height = ll[3];
                 signP.Position = new object[] { ll[0], ll[1] };
@@ -411,14 +443,13 @@ namespace AiDesignTool.LCommands
                 border.StrokeColor = cutColor;
 
 
-                docRef.SaveAs(storage + "File_All_" + label.ToString() + ".ai", saveOption);
+                docRef.SaveAs(storage + "File_All_" + panel.PrintId.ToString() + ".ai", saveOption);
 
                 //
                 allPanels.Add(panel);
                 allArts.RemoveRange(0, i);
 
-                AddMessege(new Messege("Created panel : " + label, MessegeInfo.Notification, null));
-                label++;
+                AddMessege(new Messege("Created panel : " + panel.PrintId, MessegeInfo.Notification, null));
                 if (!AutoExportPC)
                     continue;
                 //
@@ -427,21 +458,12 @@ namespace AiDesignTool.LCommands
                 appRef.ExecuteMenuCommand("Find Stroke Color menu item");
                 border.Selected = false;
 
-                for (int ij = 1; ij <= docRef.PathItems.Count; ++ij)
-                {
-                    try
-                    {
-                        if (docRef.PathItems[ij].Selected)
-                        {
-                            docRef.PathItems[ij].StrokeColor = noColor;
-                        }
-                    }
-                    catch { continue; }
-                }
+                docRef.DefaultFillColor = noColor;
+                docRef.DefaultStrokeColor = noColor;
 
                 appRef.ExecuteMenuCommand("Fit Artboard to artwork bounds");
 
-                docRef.ImageCapture(storage + label.ToString() + "_In.PNG", null, captureOptions);
+                docRef.ExportForScreens(storage, AiExportForScreensType.aiSE_PNG24, exportForScreensOptions24, exportForScreensItemToExport);
 
                 border.Selected = true;
                 signP.Selected = true;
@@ -450,20 +472,14 @@ namespace AiDesignTool.LCommands
                 docRef.PageItems.RemoveAll();
                 docRef.Paste();
 
-                for (int ij = 1; ij <= docRef.PathItems.Count; ++ij)
-                {
-                    try
-                    {
-                        docRef.PathItems[ij].StrokeColor = noColor;
-                        docRef.PathItems[ij].FillColor = noColor;
+                docRef.DefaultFillColor = noColor;
+                docRef.DefaultStrokeColor = noColor;
 
-                    }
-                    catch { continue; }
-                }
-                docRef.SaveAs(storage + "File_Cut_" + label.ToString() + ".ai", cutSaveOption);
+                docRef.Export(storage + "File_Cut_" + panel.PrintId.ToString(), AiExportType.aiAutoCAD, exportOptionsAutoCAD);
+                docRef.SaveAs(storage + "File_Cut_" + panel.PrintId.ToString() + ".ai", cutSaveOption);
                 docRef.Close();
 
-                Marshal.CleanupUnusedObjectsInCurrentContext();
+                Marshal.FinalReleaseComObject(docRef);
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
             }
@@ -577,7 +593,8 @@ namespace AiDesignTool.LCommands
                     {
                         if (input is TextFrame tf)
                         {
-                            double _move = double.Parse(elements);
+                            string[] es = elements.Split(LObjects.Constants.REGEX_DATA_FILE_DATA);
+                            double _move = double.Parse(es[0]);
                             string s = null, tfname = tf.Name;
                             while (s is null)
                                 s = tf.Contents;
@@ -590,7 +607,7 @@ namespace AiDesignTool.LCommands
                                     gi.Position[1] - gi.Height/2
                                 };
                             int c = s.Length;
-                            double sclw, sclh, minArea = 10;
+                            double sclw, sclh, minArea = double.Parse(es[1]);
 
                             CompoundPathItem[] cpis = new CompoundPathItem[c];
                             Polygon[] plgs = new Polygon[c];
@@ -624,6 +641,14 @@ namespace AiDesignTool.LCommands
                                         distances[u] -= _move;
                                     }
                                 }
+                                //while (!plgs[i].Intersects(plgs[i + 1]))
+                                //{
+                                //    for (int u = i + 1; u < c; ++u)
+                                //    {
+                                //        plgs[u] = (Polygon)mover.Transform(plgs[u]);
+                                //        distances[u] -= _move;
+                                //    }
+                                //}
                             }
                             for (int i = 0; i < c; ++i)
                             {
@@ -662,9 +687,56 @@ namespace AiDesignTool.LCommands
                         }
                         break;
                     }
-                case Spell.FitPathInsize:
+                case Spell.FitInside:
                     {
+                        string[] size = values.Split(Constants.REGEX_DATA_FILE_DATA);
+                        double width = double.Parse(size[0]), height = double.Parse(size[1]);
 
+                        wizard.FitTo(input, width, height);
+                        break;
+                    }
+                case Spell.ClippingMask:
+                    {
+                        if (input is PathItem cp)
+                        {
+                            cp.Clipping = true;
+                            PlacedItem placed = docRef.PlacedItems.Add();
+                            placed.File = WorkingFolder + LObjects.Constants.resourceFolder + values;
+                            double offset = double.Parse(magic.Elements);
+
+                            placed.Width = cp.Width + offset;
+                            placed.Height = cp.Height + offset;
+
+                            double x = cp.Position[0] + cp.Width / 2, y = cp.Position[1] - cp.Height / 2;
+                            object[] pos = { x - placed.Width / 2, y + placed.Height / 2 };
+                            placed.Position = pos;
+
+
+                            GroupItem group = docRef.GroupItems.Add();
+
+                            placed.Move(group, AiElementPlacement.aiPlaceAtBeginning);
+                            cp.Move(group, AiElementPlacement.aiPlaceAtBeginning);
+
+                            placed.Embed();
+
+                            group.Clipped = true;
+                            group.ZOrder(AiZOrderMethod.aiSendToBack);
+
+                            input = group;
+
+                        }
+                        break;
+                    }
+                case Spell.Ungroup:
+                    {
+                        if(input is GroupItem group)
+                        {
+
+                            appRef.ExecuteMenuCommand("deselectall");
+                            group.Selected = true;
+                            appRef.ExecuteMenuCommand("ungroup");
+                            input = null;
+                        }
                         break;
                     }
                 case Spell.StickPathTo:
@@ -934,6 +1006,7 @@ namespace AiDesignTool.LCommands
                         }
                         break;
                     }
+                
             }
             return input;
         }

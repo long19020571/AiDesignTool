@@ -1,4 +1,5 @@
 ﻿using LObjects;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -32,7 +33,11 @@ namespace AiDesignTool
                 Messege m;
                 while (ViewModel.UniversalMesseges.TryDequeue(out m))
                 {
-                    Run r = new Run(new string(m.messege));
+                    StringBuilder printBuilder = new StringBuilder();
+                    printBuilder.Append(m.messege);
+                    if(m.status != null)
+                        printBuilder.AppendJoin('\n', m.status);
+                    Run r = new Run(printBuilder.ToString());
                     switch (m.info)
                     {
                         case MessegeInfo.Notification:

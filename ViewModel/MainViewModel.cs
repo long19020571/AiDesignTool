@@ -149,7 +149,6 @@ public class MainViewModel : INotifyPropertyChanged
     public MainViewModel()
     {
         ControlSignal = new ManualResetEvent(false);
-        Flag = false;
 
         Profiles = new ObservableCollection<Profile>(
             DBConnector.GetAllProfiles()
@@ -214,7 +213,7 @@ public class MainViewModel : INotifyPropertyChanged
     private void OnSignaling(object parameter)
     {
         ControlSignal.Set();
-        Flag = false;
+        SignalFlag = false;
     }
     private void OnClearSession(object parameter)
     {
@@ -234,8 +233,8 @@ public class MainViewModel : INotifyPropertyChanged
             MainDriver.SetDesignConfigs(SelectedProfile.DesignConfigs);
             MainDriver.SetProgressMessege(Progress);
             MainDriver.SetWavingFlags(WavingFlags);
-            MainDriver.SetCutColor(SelectedProfile.Panel.CutColor);
             MainDriver.StartDriver();
+            MainDriver.SetCutColor(SelectedProfile.Panel.CutColor);
             SessionUnCleared = true;
             EnqueueMessege(new Messege("Loaded all Config successfilly", MessegeInfo.Notification, null));
         }
@@ -415,7 +414,8 @@ public class MainViewModel : INotifyPropertyChanged
             string f1 = SelectedProfile.FolderPath + LObjects.Constants.artFolderName,
                 f2 = SelectedProfile.FolderPath + LObjects.Constants.storageFolderName,
                 f3 = SelectedProfile.FolderPath + LObjects.Constants.printAndCutFolderName,
-                f4 = SelectedProfile.FolderPath + LObjects.Constants.dataFileName;
+                f4 = SelectedProfile.FolderPath + LObjects.Constants.dataFileName,
+                f5 = SelectedProfile.FolderPath + LObjects.Constants.resourceFolder;
             if (!Directory.Exists(f1))
             {
                 Directory.CreateDirectory(f1);
@@ -455,6 +455,13 @@ public class MainViewModel : INotifyPropertyChanged
                 File.Create(f4);
                 EnqueueMessege(
                 new Messege("Created data file.", MessegeInfo.Notification, null)
+                );
+            }
+            if (!Directory.Exists(f5))
+            {
+                Directory.CreateDirectory(f5);
+                EnqueueMessege(
+                new Messege("Created resources Folder.", MessegeInfo.Notification, null)
                 );
             }
             foreach (DesignConfig item in SelectedProfile.DesignConfigs)
@@ -533,6 +540,16 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(AutoRestartWork));
         }
     }
+    private bool _isAiRunning;
+    public bool IsAiRunning
+    {
+        get => !_isAiRunning;
+        set
+        {
+            _isAiRunning = value;
+            OnPropertyChanged(nameof(IsAiRunning));
+        }
+    }
     public ConcurrentQueue<Messege> UniversalMesseges { get; }
     public void EnqueueMessege(Messege m)
     {
@@ -581,19 +598,31 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public ManualResetEvent ControlSignal { get; set; }
-    private bool _Flag;
-    public bool Flag
+    private bool _signalFlag;
+    public bool SignalFlag
     {
-        get => _Flag;
+        get => _signalFlag;
         set
         {
-            _Flag = value;
-            OnPropertyChanged(nameof(Flag));
+            _signalFlag = value;
+            OnPropertyChanged(nameof(SignalFlag));
         }
     }
-    public void WavingFlags(bool waveing)
+    public void WavingFlags(bool waveing, Flag flag)
     {
-        Flag = waveing;
+        switch(flag)
+            {
+            case Flag.IsAiRunning:
+                {
+                    IsAiRunning = waveing;
+                    break;
+                }
+            case Flag.SignalFlag:
+                {
+                    SignalFlag = waveing;
+                    break;
+                }
+            }
     }
     //
     private BackgroundWorker _DoLoadData;
@@ -711,9 +740,11 @@ public class MainViewModel : INotifyPropertyChanged
     {
         if (e.Error != null)
         {
-            EnqueueMessege(new Messege(e.Error.Message, MessegeInfo.Exception, null));
-            if (AutoExportPC)
+            EnqueueMessege(new Messege(e.Error.Source + " occur :" + e.Error.Message, MessegeInfo.Exception, null));
+            if (AutoRestartWork)
+            {
                 ((BackgroundWorker)sender).RunWorkerAsync();
+            }
         }
 
         IsBusy = false;

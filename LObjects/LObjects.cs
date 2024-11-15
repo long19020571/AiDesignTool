@@ -2,6 +2,7 @@
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using System.Text;
+using System.Windows.Media.Media3D;
 
 namespace LObjects
 {
@@ -39,6 +40,8 @@ namespace LObjects
         public int PrintId { get; }
         [BsonIgnore]
         public List<BaseArt> ContainArts { get; set; }
+        [BsonIgnore]
+        public double[] Boundary { get; set; }
         public LPanel()
         {
             PrintId = _GlobalPrintId;
@@ -46,51 +49,46 @@ namespace LObjects
 
             ArtConfig = new ArtConfig();
             ContainArts = new List<BaseArt>();
+            Boundary = new double[4] { 0, 0, 0, 0 };
         }
-        public int CountMaxArt()
+        public double[]? PlaceArt(BaseArt art)
         {
-            return (int)(Width / (ArtConfig.Width + ArtConfig.Space)) * (int)(Height / (ArtConfig.Height + ArtConfig.Space));
-        }
-        public int[] CountMaxSide()
-        {
-            return new int[2] { (int)(Width / ArtConfig.Width), (int)(Height / ArtConfig.Height) };
-        }
-        public int[] GetRelativePosition(int ArtIndex)
-        {
-            if (ArtIndex < 0 || ArtIndex >= ContainArts.Count)
-                return null;
-            int[] s = CountMaxSide();
-            int y = ArtIndex / s[0], x = ArtIndex - y * s[0];
-            return new int[] { x, y };
-        }
-        public double[] GetPosition(int ArtIndex)
-        {
-            if (ArtIndex < 0 || ArtIndex >= CountMaxArt())
-                return null;
-            int[] s = CountMaxSide();
-            int y = ArtIndex / s[0], x = ArtIndex - y * s[0];
-            return new double[] { x * (ArtConfig.Width + ArtConfig.Space) + ArtConfig.Space / 2, y * (ArtConfig.Height + ArtConfig.Space) + ArtConfig.Space / 2 };
+            double[] last = ContainArts.Count > 0 ? ContainArts.Last().Boundary : new double[] { 0, 0, 0, 0 };
+            double[] pos = { double.NaN, double.NaN };
+            double x = last[0] + last[2], y = last[1],
+                w = x + art.Boundary[2], h = y + art.Boundary[3];
+
+            if(w <= Width)
+            {
+                if (h < Height)
+                {
+                    art.Boundary[0] = x; art.Boundary[1] = y;
+                    Boundary[3] = h > Boundary[3] ? h : Boundary[3];
+                    Boundary[2] = w > Boundary[2] ? w : Boundary[2];
+                    pos[0] = x; pos[1] = y;
+                } else
+                {
+                    return null;
+                }
+            }else
+            {
+                if (art.Boundary[3] < Height)
+                {
+                    art.Boundary[0] = 0; art.Boundary[1] = Boundary[3];
+                    pos[0] = 0; pos[1] = Boundary[3];
+                    Boundary[3] = Boundary[3] + art.Boundary[3];
+                } else
+                {
+                    return null;
+                }
+            }
+            ContainArts.Add(art);
+            return pos;
+            
         }
         public double[] GetRectId()
         {
             return new double[4] { 0, 0, ArtConfig.Space / 2, ArtConfig.Space / 2 };
-        }
-        public double[] GetRectBoundary()
-        {
-            int[] s = CountMaxSide();
-            int c = ContainArts.Count;
-            double ww = ArtConfig.Width + ArtConfig.Space, hh = ArtConfig.Height + ArtConfig.Space;
-
-            if (c == s[0] * s[1])
-                return new double[4] { 0, 0, ww * s[0], hh * s[1] };
-            else
-            {
-
-                double borderW = (c / s[0] > 0) ? s[0] * ww : c * ww,
-                    borderH = c % s[0] > 0 ? ((c / s[0]) + 1) * hh : c * hh / s[0];
-                return new double[4] { 0, 0, borderW, borderH };
-            }
-
         }
         public LPanel CopyConfig()
         {
@@ -173,12 +171,22 @@ namespace LObjects
         public string FilePath { get; set; }
         public DesignConfig DesignConfig { get; set; }
         public List<string> Values { get; set; }
+        public double[] Boundary { get; set; }
         public BaseArt()
         {
             Id = _GlobalId;
             ++_GlobalId;
             DesignConfig = new DesignConfig();
             Values = new List<string>();
+            Boundary = new double[] { double.NaN, double.NaN, double.NaN, double.NaN };
+        }
+        public BaseArt(double width, double height)
+        {
+            Id = _GlobalId;
+            ++_GlobalId;
+            DesignConfig = new DesignConfig();
+            Values = new List<string>();
+            Boundary = new double[] { double.NaN, double.NaN, width, height};
         }
     }
     public class Arts
@@ -331,10 +339,12 @@ namespace LObjects
         ShowAllText,
         CreateOutlineText,
         StickTextTogether,
-        FitPathInsize,
+        FitInside,
         Rotate,
         MoveToTouch,
         StickPathTo,
+        ClippingMask,
+        Ungroup,
         MirrorSnowFlake,
         MoneyHolder1
     }
@@ -342,14 +352,17 @@ namespace LObjects
     {
         TextFrame,
         PathItem,
-        CompoundPathItem
+        CompoundPathItem,
+        GroupItem,
+        PlacedItem,
+        All
     }
     public class Messege
     {
         public string messege { get; set; }
         public MessegeInfo info { get; set; }
-        public object status { get; set; }
-        public Messege(string messege, MessegeInfo info, object status)
+        public string[] status { get; set; }
+        public Messege(string messege, MessegeInfo info, string[] status)
         {
             this.messege = messege;
             this.info = info;
@@ -394,20 +407,31 @@ namespace LObjects
                 OrderNumber = paras[2];
                 Data = paras[3];
             }
+            else if (paras.Length == 3)
+            {
+                Count = int.Parse(paras[0]);
+                Label = paras[1];
+                OrderNumber = paras[2];
+            }
+            else if (paras.Length == 2)
+            {
+                Count = int.Parse(paras[0]);
+                Label = paras[1];
+            }
         }
         public string AsString()
         {
             StringBuilder sb = new StringBuilder();
             sb.Append(Id);
-            sb.Append("/t");
+            sb.Append("\t");
             sb.Append(Count);
-            sb.Append("/t");
+            sb.Append("\t");
             sb.Append(Label);
-            sb.Append("/t");
+            sb.Append("\t");
             sb.Append(OrderNumber);
-            sb.Append("/t");
+            sb.Append("\t");
             sb.Append(Data);
-            sb.Append("/t");
+            sb.Append("\t");
             return sb.ToString();
         }
     }
@@ -417,6 +441,7 @@ namespace LObjects
         public const string artFolderName = "\\arts\\";
         public const string printAndCutFolderName = "\\printAndCut\\";
         public const string storageFolderName = "\\storage\\";
+        public const string resourceFolder = "\\resources\\";
         public const char REGEX_DATA_FILE_COLUMN = '\t';
         public const char REGEX_DATA_FILE_DATA = ';';
         public static readonly List<string> REF_LIST = new List<string>()
@@ -442,5 +467,11 @@ namespace LObjects
         {
 
         }
+    }
+    public enum Flag
+    {
+        IsAiRunning,
+        SignalFlag
+
     }
 }

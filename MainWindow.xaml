@@ -156,7 +156,7 @@
                         <Button       Grid.Row="2" Grid.Column="1" Content="Create PC" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding CreatePrintAndCut}"/>
                         <Button       Grid.Row="3" Grid.Column="1" Content="Verify 2" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding Verify}"/>
 
-                        <Button       Grid.Row="0" Grid.Column="2" Content="Signaling" IsEnabled="{Binding Flag, Mode=OneWay}" Command="{Binding Signaling}"/>
+                        <Button       Grid.Row="0" Grid.Column="2" Content="Signaling" IsEnabled="{Binding SignalFlag, Mode=OneWay}" Command="{Binding Signaling}"/>
                         <Button       Grid.Row="1" Grid.Column="2" Content="Clear Session" IsEnabled="{Binding SessionUnCleared, Mode=OneWay}" Command="{Binding ClearSession}"/>
                         <Button       Grid.Row="2" Grid.Column="2" Content="Pre-Load" IsEnabled="{Binding PreLoaded, Mode=OneWay}" Command="{Binding PreLoad}"/>
                         <Button       Grid.Row="3" Grid.Column="2" Content="Re-start Driver" IsEnabled="{Binding WorkingMode, Mode=OneWay}" Command="{Binding DoWork}"/>
