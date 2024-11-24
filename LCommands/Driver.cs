@@ -7,15 +7,12 @@ using NetTopologySuite.Geometries.Utilities;
 using NetTopologySuite.IO;
 using NetTopologySuite.Operation.Union;
 using SkiaSharp;
-using System;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Windows;
-using System.Xml.Linq;
 //using System.Windows.Controls;
 
 namespace AiDesignTool.LCommands
@@ -140,7 +137,7 @@ namespace AiDesignTool.LCommands
 
         public static bool StartDriver()
         {
-            appRef = new Illustrator.Application();
+            appRef = new Application();
             AiProcess = Process.GetProcessesByName("Illustrator")[0];
             AiProcess.EnableRaisingEvents = true;
             AiProcess.Exited += AiProcess_Exited;
@@ -149,6 +146,9 @@ namespace AiDesignTool.LCommands
                 Thread.Sleep(500);
                 AiProcess.Refresh();
             }
+            WavingFlags(true, Flag.IsAiRunning);
+            for (int i = 1; i < appRef.Documents.Count; ++i)
+                appRef.Documents[i].Close(AiSaveOptions.aiDoNotSaveChanges);
 
             appRef.UserInteractionLevel = AiUserInteractionLevel.aiDontDisplayAlerts;
             saveOption = new IllustratorSaveOptions();
@@ -228,7 +228,7 @@ namespace AiDesignTool.LCommands
                 if (order.Data != null)
                 {
                     foreach (string ss in order.Data.Split(Constants.REGEX_DATA_FILE_DATA))
-                        art.Values.Add(ss);
+                        art.Values.Add(ss.Trim());
                 }
                 if (art.Values.Count != dc.ItemConfigs.Count)
                 {
@@ -274,7 +274,6 @@ namespace AiDesignTool.LCommands
                         break;
                     }
                 }
-                
             }
             if (count != dc.ItemConfigs.Count)
                 return null;
@@ -330,7 +329,6 @@ namespace AiDesignTool.LCommands
                         originI[index2] = tmp;
                         tmp.Hidden = true;
                     }
-                    tmp = null;
                 }
                 while (ats.ArtQueue.Count > 0)
                 {
@@ -364,6 +362,7 @@ namespace AiDesignTool.LCommands
                             copyI[i].Delete();
                         } catch { }
                     }
+                    ReleaseObject(copyI);
                     
                     ats.ArtQueue.Dequeue();
                     allArts.Add(art);
@@ -373,7 +372,11 @@ namespace AiDesignTool.LCommands
                 }
                 docRef.Close(AiSaveOptions.aiDoNotSaveChanges);
 
-                Marshal.FinalReleaseComObject(docRef);
+                ReleaseObject(refI);
+                ReleaseObject(originI);
+                ReleaseObject(mergeObjs.ToArray());
+                ReleaseObject(docRef);
+
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
 
@@ -393,7 +396,7 @@ namespace AiDesignTool.LCommands
             {
                 return f1.Id.CompareTo(f2.Id);
             });
-
+            int p = 0;
 
             //int maxCount = TemplatePanel.CountMaxArt();
 
@@ -418,8 +421,8 @@ namespace AiDesignTool.LCommands
                     GroupItem pItem = docRef.GroupItems.CreateFromFile(allArts[i].FilePath);
                     groups.Add(pItem);
                     pItem.Position = new object[] { pos[0], -pos[1] };
-                    ++i;
-                    ProgressMessege(true, i);
+                    ++i; ++p;
+                    ProgressMessege(true, p);
                 }
                 List<BaseArt> errors = CheckPlacedItem(groups, panel.ContainArts);
                 if (errors.Count > 0)
@@ -446,12 +449,15 @@ namespace AiDesignTool.LCommands
                 docRef.SaveAs(storage + "File_All_" + panel.PrintId.ToString() + ".ai", saveOption);
 
                 //
+
+                File.WriteAllLines(storage + "File_All_" + panel.PrintId.ToString() + ".txt", panel.ContainArts.Select(o => o.Values[0]));
                 allPanels.Add(panel);
                 allArts.RemoveRange(0, i);
-
-                AddMessege(new Messege("Created panel : " + panel.PrintId, MessegeInfo.Notification, null));
                 if (!AutoExportPC)
-                    continue;
+                {
+                    AddMessege(new Messege("Created panel : " + panel.PrintId, MessegeInfo.Notification, null));
+                    continue; 
+                }
                 //
                 appRef.ExecuteMenuCommand("deselectall");
                 border.Selected = true;
@@ -479,7 +485,11 @@ namespace AiDesignTool.LCommands
                 docRef.SaveAs(storage + "File_Cut_" + panel.PrintId.ToString() + ".ai", cutSaveOption);
                 docRef.Close();
 
-                Marshal.FinalReleaseComObject(docRef);
+                AddMessege(new Messege("Created panel : " + panel.PrintId, MessegeInfo.Notification, null));
+
+                ReleaseObject(groups.ToArray());
+                ReleaseObject(sign, signP, border, docRef);
+
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
             }
@@ -689,6 +699,7 @@ namespace AiDesignTool.LCommands
                     }
                 case Spell.FitInside:
                     {
+                        if (input == docRef.Selection) ;
                         string[] size = values.Split(Constants.REGEX_DATA_FILE_DATA);
                         double width = double.Parse(size[0]), height = double.Parse(size[1]);
 
@@ -1098,6 +1109,17 @@ namespace AiDesignTool.LCommands
                 mppeds.Add(new MappedPolygon(mappings[i], wkbReader));
             }
             return mppeds;
+        }
+        public static void ReleaseObject(params object[] obj)
+        {
+            for(int i = 0; i < obj.Length; ++i)
+            {
+                if (obj[i] != null && Marshal.IsComObject(obj[i]))
+                {
+                    Marshal.ReleaseComObject(obj[i]);
+                    obj[i] = null;
+                }
+            }
         }
     }
     public class GGConnector

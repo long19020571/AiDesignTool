@@ -2,7 +2,6 @@
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using System.Text;
-using System.Windows.Media.Media3D;
 
 namespace LObjects
 {
@@ -60,7 +59,7 @@ namespace LObjects
 
             if(w <= Width)
             {
-                if (h < Height)
+                if (h <= Height)
                 {
                     art.Boundary[0] = x; art.Boundary[1] = y;
                     Boundary[3] = h > Boundary[3] ? h : Boundary[3];
@@ -72,7 +71,7 @@ namespace LObjects
                 }
             }else
             {
-                if (art.Boundary[3] < Height)
+                if (Boundary[3] + art.Boundary[3] <= Height)
                 {
                     art.Boundary[0] = 0; art.Boundary[1] = Boundary[3];
                     pos[0] = 0; pos[1] = Boundary[3];

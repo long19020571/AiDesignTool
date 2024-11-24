@@ -5,7 +5,6 @@ using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 
@@ -743,6 +742,7 @@ public class MainViewModel : INotifyPropertyChanged
             EnqueueMessege(new Messege(e.Error.Source + " occur :" + e.Error.Message, MessegeInfo.Exception, null));
             if (AutoRestartWork)
             {
+                OnDoWork(sender);
                 ((BackgroundWorker)sender).RunWorkerAsync();
             }
         }
