@@ -21,16 +21,9 @@ It leverages the **Adobe Illustrator COM library** to automate tasks, modify tem
 - 💾 Save and export processed templates in multiple formats.
 
 ---
+## Architecture
+- [User] → [WPF UI (XAML)] → [ViewModel] → [Models] → [COM Service] → [Adobe Illustrator]
 
-## 📦 Installation
-
-### Requirements
-- Windows 10/11
-- .NET Framework 4.7.2+ (or .NET 6 if upgraded)
-- Adobe Illustrator (tested with version XX+)
-- Visual Studio 2022 (for development)
-
-### Setup
-1. Clone the repository:
-```bash
-git clone https://github.com/long19020571/AiDesignTool.git
+---
+## What is differences ?
+- 
